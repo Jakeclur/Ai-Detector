@@ -58,7 +58,7 @@ There is no AI model inside, and nothing you paste is sent anywhere.
   | any | **Mixed**, when one stretch of the text scores 65–70+ while another scores 35 or below |
 
   Short texts are pulled towards the middle, because less text means less evidence.
-- **Certain giveaways box:** leftover chatbot lines such as "I hope this helps!", "Would you like me to…", "[Your Name]" or ChatGPT citation codes (`oaicite`, `utm_source=chatgpt.com`).
+- **Certain giveaways box:** leftover chatbot lines such as "As an AI language model", "Would you like me to…", "[Your Name]" or ChatGPT citation codes (`oaicite`, `utm_source=chatgpt.com`).
 - **Caution box:** warns when the text is formal, very plain, mostly a list, short, or casual-but-very-tidy, because careful human writing in those styles can look AI-like.
 - **Which AI does it look more like?** A Claude ↔ ChatGPT bar with the evidence for each side.
 - **Section by section:** each paragraph (or ~110-word chunk) scored on its own.
@@ -114,27 +114,27 @@ The weights were set by hand from the research, then checked against a labelled 
 
 | Clue | What it looks for | Why |
 |---|---|---|
-| **Certain giveaways** | "As an AI language model", "I hope this helps", "Would you like me to…", "If you want, I can…", "Certainly!", "[Your Name]", ChatGPT citation codes | Text left behind when a chatbot answer is pasted unedited |
-| **Measured AI words** | *delve, showcasing, underscores, tapestry, intricate, meticulous, dependable, steady, thoughtful…* | Only words that studies **measured** against human writing: Kobak et al. (15M abstracts), Reinhart et al., and Graphite (Opus 5.5 uses "dependable" 23× the human rate). Blog-list favourites were cut, because Originality.ai found many (e.g. "delve") were rare in real ChatGPT output |
+| **Certain giveaways** | "As an AI language model", "Would you like me to…", "If you want, I can…", "Certainly!", "[Your Name]", ChatGPT citation codes, a "Copy code" line | Text left behind when a chatbot answer is pasted unedited. ("I hope this helps" used to be here, but real people write it too, so since v5 it's an ordinary stock phrase) |
+| **Measured AI words** | *delve, showcasing, underscores, tapestry, intricate, meticulous, dependable, steady, thoughtful, solace, newfound…* | Each word counts at most twice, and everyday words like "essential" or "unique" count half, because students use them too. Only words that studies **measured** against human writing: Kobak et al. (15M abstracts), Reinhart et al., and Graphite (Opus 5.5 uses "dependable" 23× the human rate). Blog-list favourites were cut, because Originality.ai found many (e.g. "delve") were rare in real ChatGPT output |
 | **Stock phrases** | "plays a crucial role", "it's important to note", "This matters" (116×), "Why X matters" (92×), "Looking ahead" (40×), "adds another layer" (27×), "rather than simply" (32×), "is more than a X, it…" (98×) | Wikipedia's *Signs of AI writing*; Graphite 2026 study of Opus 5.5 |
 | **Fiction clichés** | "for a long moment", "said quietly", "felt something shift", "paused", "stared", "in that moment", "weathered hands" | Pangram found these rose sharply in Opus 5.5 stories |
-| **Tidy hopeful ending** | Stories that end on "smiled", "for the first time", "hope", "together"… | Pangram: Opus 5.5 stories lean towards hope, resilience and family |
+| **Tidy hopeful ending** | Stories (text with dialogue or fiction clichés) that end on "smiled", "for the first time", "hope", "together"… | Pangram: Opus 5.5 stories lean towards hope, resilience and family |
 | **Email boilerplate** | "I hope this email finds you well", "I wanted to follow up", "Please don't hesitate to reach out", "Thank you for your time and consideration" | Common AI email openers and closers. Each counts only a little, more when an opener and closer appear together |
 | **"Not X, it's Y" contrasts** | "It's not just a tool, it's a movement", "isn't X. It's Y" | Wikipedia's top tell. **Weakened**: Opus 5.5 uses 28% fewer negations than Opus 5 |
 | **Chatbot framing** | Sentences opening "The key is", "Here's", "That's why", "Short answer", "In short" | Assistant answer style |
-| **Trailing -ing clauses** | ", highlighting its importance" | Reinhart et al.: instruction-tuned AI uses these 2–5× more than people |
+| **Trailing -ing clauses** | ", highlighting its importance" (lists like "reading, writing and drawing" don't count) | Reinhart et al.: instruction-tuned AI uses these 2–5× more than people |
 | **Formal transitions** | Sentences starting "Moreover", "Furthermore", "Additionally", "Ultimately" | Classic ChatGPT style |
 | **Summary closers** | "In short", "In summary", "Overall", "The bottom line" near the end | Pangram: Opus 5.5 summary markers up ~10× and "in short" up 11× vs Opus 5 |
 | **Vague attributions** | "experts suggest", "studies show", "it is widely believed" | Wikipedia: AI cites unnamed authorities |
 | **Hedging** | "may", "often", "typically", "it depends", "not necessarily" | Small weight. Pangram: caveat markers up 23% in Opus 5.5; GPT-6 overuses "may provide", "not necessarily" |
 | **Generic praise words** | "amazing", "valuable", "meaningful", "seamless", "transformative" | Promotional tone |
-| **Bullets, headings, bold** | Markdown density | Small weight, because human notes and docs use them too |
+| **Bullets, headings, bold** | Markdown density, plus "Introduction:" / "Conclusion:" label lines | Small weight, because human notes and docs use them too |
 | **Colons** | Colons introducing a point | Very small weight. Opus 5 used 6.1 per 1,000 words, Opus 5.5 only 1.6 |
 | **Rule of three** | "A, B, and C" lists | Small weight |
 | **Em dashes** | — | **Very small and version-dependent**: Opus 5 used about 3–13 per 1,000 words, Opus 5.5 almost none, and GPT-5 still often uses them. Mainly used to guess the model (see below) |
 | **Few concrete specifics** | Few names, numbers or quotes per 100 words | Absence clue, very small weight |
 | **Overly even tone** | Very uniform sentence and paragraph lengths, with no ! or ? | Pangram: Opus 5.5 sentences are shorter and more uniform (spread 0.53 → 0.48) |
-| **Casual but too clean** | Sounds casual ("honestly", "kind of") but has no slips at all, even rhythm and a generic or moral ending | Targets AI told to "write like a teen". Moderate weight, and shows its own caution note |
+| **Casual but too clean** | Sounds casual ("honestly", "kind of", slang; "I think" doesn't count) but has no slips at all, even rhythm and a generic or moral ending | Targets AI told to "write like a teen". Moderate weight, and shows its own caution note |
 | **Neat moral ending** | Last sentence like "It's all about balance" or "That's what matters most" | Stock wrap-up |
 
 ### Pulls the score towards human
@@ -176,18 +176,36 @@ Each family has its own fingerprint clues. The detector adds them up and shows a
 
 ## How accurate is it?
 
-### Main test set
-216 real human passages, collected from text available offline: Python documentation, package READMEs, Go docs, Newton's *Opticks*, the GPL, and classic novels and speeches. Plus 53 AI passages in five styles, all written by Claude, with 20 kept back for checking.
+### Real-world test (Ghostbuster dataset)
+The [Ghostbuster dataset](https://github.com/vivek3141/ghostbuster-data) (Verma et al., 2023, CC BY 3.0) has real human writing and real ChatGPT (gpt-3.5-turbo) and Claude (2023) output written for the same prompts. 2,056 human and 1,800 AI texts were used. Weights were tuned on one half and the other half was only used for checking.
+
+| Kind of text | v5 flagged (cut-off 55) | v4 flagged |
+|---|---|---|
+| Human: student essays (299) | 6 (2%) | 11 |
+| Human: Reddit short stories (300) | 0 | 1 |
+| Human: Reuters news (300) | 0 | 0 |
+| Human: essays by English learners: ETS/TOEFL, Lang-8, PELIC, BAWE (1,157) | 4 (0.3%) | 7 |
+| **All human (2,056)** | **10 (0.5%)** | 19 (0.9%) |
+| ChatGPT essays / stories / news (300 each) | 81% / 35% / 7% | 83% / 20% / 7% |
+| Claude essays / stories / news (300 each) | 23% / 1% / 3% | 25% / 1% / 3% |
+| **All AI (1,800)** | **25.0%** | 23.2% |
+
+On the half kept back for checking: humans wrongly flagged 6 → 3 (of 1,007), AI caught 22.4% → 24.0%.
+
+### Own test set
+216 real human passages, collected from text available offline: Python documentation, package READMEs, Go docs, Newton's *Opticks*, the GPL, and classic novels and speeches. Plus 53 AI passages in newer chatbot styles, all written by Claude, with 20 kept back for checking.
 
 | Kind of text | Flagged as AI (cut-off 55) |
 |---|---|
-| Real human passages (216) | **0%** (9, about 4%, landed in "inconclusive") |
+| Real human passages (216) | **0%** (4 landed in "inconclusive"; max 45) |
 | AI, classic ChatGPT essay style | 100% |
-| AI, modern chatbot answers | ~55% |
-| AI, short stories | ~40% |
-| AI, emails and posts | ~15% |
+| AI, modern chatbot answers | ~33% |
+| AI, short stories | ~25% |
+| AI, emails and posts | ~13% |
 | AI told to sound like a teenager | ~10% |
 | Any text with leftover chatbot lines | nearly always |
+
+v4 caught more of these (47% vs 40% overall), mostly through the "tidy hopeful ending" and "casual but too clean" clues. Those clues were also what wrongly flagged real English learners' essays, so they were narrowed in v5.
 
 ### Built-in 20 sample passages (Test lab)
 11 AI passages (5 Claude-style, 6 ChatGPT-style) and 9 everyday "human" passages: a teen message, a text to a mate, meeting minutes, a science report, writing by a non-native English speaker, a reflection, a sports recap, a complaint letter and a packing list.
@@ -195,13 +213,15 @@ Each family has its own fingerprint clues. The detector adds them up and shows a
 - Model guess: **8 right, 0 wrong, 3 "can't tell"**.
 
 ### Mixed text
-An essay made of 3 human paragraphs plus 1 pasted AI paragraph scored **25** overall and was labelled **"Mixed"**. The AI paragraph's section scored **67**, and the sliding window reached **76**. No stretch of human text in the test set scored above 39.
+An essay made of 3 human paragraphs plus 1 pasted AI paragraph scored **22** overall and was labelled **"Mixed"**. The AI paragraph's section scored **68**, and the sliding window reached **71**.
 
-### ⚠️ Why these numbers are optimistic
-- **All AI text was written by one AI (Claude).** The "ChatGPT" passages are Claude *imitating* ChatGPT, not real ChatGPT output.
-- **The 9 everyday "human" sample passages were also written by Claude**, imitating people.
+### ⚠️ Why these numbers are limited
+- **The real chatbot text is from 2023.** Today's ChatGPT and Claude write differently (for example, Claude Opus 5.5 hardly uses em dashes).
+- **The newer-style AI text was all written by one AI (Claude).** The "ChatGPT" passages are Claude *imitating* ChatGPT, and the 9 everyday "human" sample passages are Claude imitating people.
 - **Some clues were tuned after looking at the 20 sample passages**, so the 8/11 result is in-sample.
-- **The real human texts are mostly formal or old.** There's no genuine teenage or casual writing.
+- **The model guess was wrong on real 2023 Claude essays**: when it guessed, it said "ChatGPT-leaning", because its Claude clues describe 2026 Claude versions.
+
+A small trained word-frequency model was also tried on the Ghostbuster data. It caught about twice as much 2023 chatbot text with no extra humans flagged, but it didn't help at all on newer-style text and can't explain its decisions clue by clue, so it isn't used.
 
 For comparison, Pangram, a commercial detector that runs a real AI model, reports catching 99.7% of Claude Opus 5.5 answers.
 
@@ -211,8 +231,9 @@ For comparison, Pangram, a commercial detector that runs a real AI model, report
 
 - **It misses most plain, edited or "humanised" AI text.** AI imitating a teen with lowercase starts and slang looks human to it.
 - **It's unreliable under about 150 words.**
-- **Real accuracy is unknown** until it's tested on real ChatGPT/Claude output and real casual human writing.
-- **The model guess is new**, and only checked on 11 imitations.
+- **It misses most real chatbot text**: about 3 in 4 in the real-world test, and almost all Claude stories and news.
+- **Accuracy on today's chatbots is unknown.** The real chatbot test text is from 2023.
+- **The model guess is weak**: right on the imitations, but it never recognised real 2023 Claude text.
 - **Clues drift with every model release.** Em dashes are the best example: very common in Opus 5, almost gone in Opus 5.5.
 - **English only.** It warns when text doesn't look like English.
 - **Style comparison is rough** under 300 words per text, or between different kinds of writing.
@@ -226,6 +247,7 @@ A 2023 Stanford study (Liang et al.) found commercial GPT detectors wrongly flag
 - gives absence-type clues (no names, even rhythm) only small weights
 - shows a caution when text is formal, very plain, list-heavy, short, or casual-but-tidy
 - treats "Inconclusive" as not flagged
+- is tested on 1,157 real essays by English learners (ETS/TOEFL, Lang-8, PELIC, BAWE): 4 flagged (0.3%)
 
 ---
 
@@ -242,7 +264,9 @@ src/
 tests/
   lab.js                   ← run Test lab-format files from the command line
   eval_corpus.js           ← score the larger labelled corpus per group
+  eval_ghostbuster.js      ← score real human and real ChatGPT/Claude text (Ghostbuster dataset)
   data/
+    fetch_ghostbuster.sh   ← downloads the Ghostbuster texts (not committed)
     make_dataset.py        ← assembles tests/data/dataset.json
     build_human.py         ← collects human prose from docs on the machine (not committed)
     extra_human.py         ← public-domain human passages (Austen, Twain, Lincoln…)
@@ -268,6 +292,11 @@ node tests/lab.js my_samples.txt 50       # your own file and cut-off
 # run the larger corpus
 python3 tests/data/make_dataset.py        # once (paths in build_human.py may need adjusting)
 node tests/eval_corpus.js
+
+# real human vs real ChatGPT/Claude text (needs git and internet once)
+bash tests/data/fetch_ghostbuster.sh
+node tests/eval_ghostbuster.js tune       # look at this while changing weights
+node tests/eval_ghostbuster.js holdout    # check this at the end
 ```
 
 ### Tuning workflow
@@ -275,7 +304,7 @@ node tests/eval_corpus.js
 2. Paste them into the **Test lab** (or save them as a `---`-separated file and run `node tests/lab.js file.txt`).
 3. Look at the misses. Which clues fired, and which didn't?
 4. Adjust `MODEL.w` (weights), `MODEL.bias` or `BANDS` in `src/core.js`, or add or remove phrases in the lists at the top of that file.
-5. Rebuild and re-run. **Never accept a change that wrongly flags more human text.** Check the human max score stays well below 55.
+5. Rebuild and re-run `tests/lab.js`, `tests/eval_corpus.js` and `tests/eval_ghostbuster.js`. **Never accept a change that wrongly flags more human text**, especially the English-learner groups.
 
 ---
 
@@ -287,6 +316,7 @@ node tests/eval_corpus.js
 | v2 | Research-based clues (measured AI words, stock phrases, "not X, it's Y", -ing clauses, chatbot framing, human slips); 0% human text flagged, ~40% of AI caught |
 | v3 | Certain giveaways, Markdown and hidden-character checks, section-by-section scan, Compare tab, .txt/.docx upload, English check, copy summary |
 | v4 | Text cleaning (hidden characters, look-alike letters, quotes); 2026 evidence (Opus 5.5, GPT-5.x/6); version-aware weights; structure clues (closers, hedging, vague attributions, praise words, colons, specifics, evenness); fiction, email and too-clean-casual clues; Claude vs ChatGPT attribution; inconclusive/mixed bands; sliding window; fairness cautions; Test lab tab |
+| v5 | Tested on real data (2,056 human and 1,800 ChatGPT/Claude texts from the Ghostbuster dataset). Fixed clues that wrongly flagged students and English learners ("I hope this helps" as a certain giveaway, "I think" as casual, hopeful endings in essays, lists of -ing words, repeated everyday words). Weights re-fitted (70% hand-set, 30% fitted). Humans flagged 19 → 10, real AI caught 23% → 25%. Added "Introduction:"-style labels and a few measured words. Fixed .docx error message and Test lab model check |
 
 ---
 
@@ -302,6 +332,7 @@ node tests/eval_corpus.js
 - Kobak et al., [Delving into ChatGPT usage in academic writing through excess vocabulary](https://arxiv.org/abs/2406.07016)
 - Reinhart et al., [Do LLMs write like humans?](https://arxiv.org/abs/2410.16107) (PNAS 2025)
 - Liang et al., [GPT detectors are biased against non-native English writers](https://arxiv.org/abs/2304.02819) (2023)
+- Verma et al., [Ghostbuster: Detecting text ghostwritten by large language models](https://arxiv.org/abs/2305.15047) (2023) and its [dataset](https://github.com/vivek3141/ghostbuster-data) (CC BY 3.0)
 - Hans et al., [Binoculars: zero-shot detection of LLM-generated text](https://arxiv.org/abs/2401.12070)
 
 ---

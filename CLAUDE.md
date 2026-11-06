@@ -19,6 +19,7 @@ This file gives a Claude Code session the full context of how this project was b
 ## How to build and test
 - **Edit `src/`, never `index.html`.** Run `python3 build.py` to regenerate `index.html` (it inserts `src/core.js` between the `// ==CORE==` markers and `src/testlab_samples.txt` as a JSON string).
 - `node tests/lab.js [file] [cutoff]` runs Test lab-format files (`---`-separated, label on the first line: Human/Claude/ChatGPT/AI).
+- `bash tests/data/fetch_ghostbuster.sh` then `node tests/eval_ghostbuster.js tune|holdout|all` scores **real** human text (student essays, Reddit stories, Reuters, English-learner essays) and **real** ChatGPT/Claude 2023 output (Ghostbuster dataset, CC BY 3.0, gitignored). Tune on `tune`, check `holdout` once.
 - `python3 tests/data/make_dataset.py && node tests/eval_corpus.js` scores the larger corpus. The machine-collected human part (`human.json`, `dataset.json`) is gitignored because it's other projects' text under their licences; `build_human.py` has Linux paths from the original environment and may need adjusting.
 - No npm or pip packages are required.
 - For a visual check, open `index.html` in a browser and click each sample button, the Compare example and "Load 20 sample passages" in the Test lab. There should be no console errors.
@@ -26,7 +27,7 @@ This file gives a Claude Code session the full context of how this project was b
 ## Architecture (src/core.js)
 - `cleanText(raw)` → `{text, notes}`: strips zero-width and hidden characters, normalises odd spaces, converts full-width characters, folds Cyrillic/Greek look-alikes **only inside words that also contain Latin letters**, and straightens quotes. The page shows a notice from `notes`.
 - `features(text)` → rates for ~25 clues plus `counts` (for UI text) and `hits` (highlight ranges: `{start, end, type, label}` with types `hard | word | phrase | struct | trans`).
-- `MODEL` = `{bias, w, cap}`: logistic model `z = bias + Σ w·min(f, cap)`. Current bias **-1.9**.
+- `MODEL` = `{bias, w, cap}`: logistic model `z = bias + Σ w·min(f, cap)`. Current bias **-2.0**. v5 weights = 70% v4 hand-set + 30% a constrained logistic fit (humans weighted 3×, signs kept) on the Ghostbuster tune half plus this repo's corpus.
 - `analyze(text, {noShrink})` → `score` (0–100, shrunk towards 50 for short texts: confidence from 40→300 words), `band` (`human` <35, `inconclusive` 35–54, `ai` ≥55; any hard giveaway with score ≥45 → `ai`), `contrib`, `hits`, `counts`.
 - `attribute(text, r)` → `{claude, gpt, lean, confidence, ev}` from `CLAUDE_FP` / `GPT_FP` regex lists plus formatting rules (bold labels, headers, emoji → GPT; plain bullets without bold, spaced em dash, short even sentences → Claude). `lean` needs total ≥2 and margin ≥1.5. Confidence is "medium" only if margin ≥4 and total ≥5. It's only shown when score ≥45.
 - `segments(text)`: paragraph sections (or ~110-word sentence runs), each scored with `analyze`.
@@ -49,14 +50,16 @@ This file gives a Claude Code session the full context of how this project was b
 - Em dash claim (Opus 5 ~15/1,000, Opus 5.5 ~0.8): direction right, but Opus 5 was ~3–13 and Opus 5.5 ~0.02–0.04 depending on the study.
 - "Rely on structure over famous words": partly. Measured words are strong; famous *unmeasured* words aren't. Both are now used.
 
-## Current results (v4)
-- 216 real human passages (docs, READMEs, Go spec, Newton, GPL, public-domain literature): **0 flagged at 55**, max 42, 9 inconclusive.
-- 53 AI passages by style (cut-off 55): classic ChatGPT essays 100%, modern answers ~55%, stories ~40%, emails ~15%, AI-as-teen ~10%. Hold-out set: 9/20.
-- Built-in 20 samples: AI 8/11 caught, humans 0/9 flagged, model guess 8 right, 0 wrong, 3 can't tell. **In-sample**: fiction clues were added after seeing the ChatGPT-style story.
-- Mixed essay (3 human paragraphs + 1 AI paragraph): overall 25 → band "Mixed"; AI section 67; window max 76; max human window in corpus 39.
-- **Bias warning:** all AI text was written by Claude, "ChatGPT" passages are imitations, the 9 everyday human samples are Claude imitations, and there's no real teen or casual human text.
+## Current results (v5)
+- **Ghostbuster real data, cut-off 55** (2,056 human / 1,800 AI): humans flagged **10 (0.5%)** (v4: 19). Student essays 6/299, English learners 4/1,157, stories 0/300, news 0/300. AI caught **25.0%** (v4: 23.2%): ChatGPT essays 81%, stories 35%, news 7%; Claude essays 23%, stories 1%, news 3%. Hold-out half: humans 6→3 of 1,007, AI 22.4%→24.0%.
+- Attribution on real 2023 Claude essays: never "Claude", sometimes "ChatGPT" (Claude clues are 2026-era).
+- Own corpus: 216 human passages 0 flagged (max 45, 4 inconclusive). 53 Claude-written AI passages: 39.6% (v4 47.2%; losses are stories/teen-style that relied on the hopeful-ending and too-clean clues, which were also what flagged real learners).
+- Built-in 20 samples: AI 8/11, humans 0/9, model 8 right, 0 wrong, 3 can't tell.
+- Mixed essay: overall 22 → "Mixed"; AI section 68; window max 71.
+- A trained common-word logistic model (400 words, L2) was prototyped: on Ghostbuster hold-out it raised AI caught at 0 human FPs from ~11% to ~27% (raw z), but did nothing for the newer-style corpus and isn't explainable per clue, so it was **not shipped**. Possible future option if the owner wants it.
 
 ## Decisions and rejected ideas
+- **v5 fairness fixes (from real learner essays):** "I hope this helps" is a stock phrase, not a certain giveaway (a Reddit writer used it); "I think" doesn't count as casual for the too-clean rule; the hopeful-ending clue needs dialogue or fiction clichés; lists of -ing words aren't trailing clauses; each AI word counts at most twice and tier-1 everyday words count half; "Copy code" only counts on its own line.
 - **Rejected:** contractions as an AI sign. An automatic logistic fit wanted it only because the human corpus was formal; it would flag real teens.
 - **Rejected:** nominalisation rate (-tion/-ment) and word length. Genre-confounded, and unfair to formal and non-native writers.
 - **Rejected:** a neural model (couldn't run or test one).
@@ -66,7 +69,7 @@ This file gives a Claude Code session the full context of how this project was b
 - A missing final full stop only counts as a human slip when the last line is over 6 words (email sign-offs like "Best, Alex" were being counted).
 
 ## Known weak spots / next steps
-1. **Tune on real data.** The owner is collecting real ChatGPT output, Claude output, their own writing and friends' casual writing, and will paste Test lab results. Use them to re-fit weights. Keep human false positives at 0 and check the human max score stays well below 55.
+1. **Tune on real modern data.** Ghostbuster (2023 models) is now used; still needed: real 2026 ChatGPT/Claude output and real teen writing. The owner is collecting real ChatGPT output, Claude output, their own writing and friends' casual writing, and will paste Test lab results. Use them to re-fit weights. Keep human false positives at 0 and check the human max score stays well below 55.
 2. AI told to write like a teen with lowercase starts and slang currently looks human (slips outweigh everything). Any fix must not flag real teens. Only change it with real teen text to test against.
 3. AI emails are mostly missed; plain AI emails look like competent human emails.
 4. Attribution is only checked on 11 imitations. Validate it on real outputs, and consider Gemini/Grok fingerprints if real samples arrive.

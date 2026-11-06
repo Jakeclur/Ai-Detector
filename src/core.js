@@ -1,6 +1,6 @@
 // ==CORE==
 /* =====================================================================
-   AI Text Detector engine (v4). Rules only: no model, no network.
+   AI Text Detector engine (v5). Rules only: no trained text model, no network.
    Evidence sources (see the page's "research" section):
    - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
    - Reinhart et al., PNAS 2025 (participial clauses etc.)
@@ -35,8 +35,8 @@ function cleanText(raw) {
 // Words with MEASURED over-use vs human writing (not blog lists). weight ~ strength.
 const AI_WORDS = {
   3: ["delve", "delves", "delved", "delving", "tapestry", "camaraderie", "intricate", "intricacies", "underscores", "underscored", "underscoring", "showcasing", "showcases", "testament", "meticulous", "meticulously", "interplay", "unwavering", "multifaceted", "ever-evolving", "dependable"],
-  2: ["pivotal", "fostering", "fosters", "vibrant", "enduring", "garnered", "bolstered", "seamless", "seamlessly", "invaluable", "transformative", "resonate", "resonates", "grappling", "nuanced", "notably", "commendable", "palpable", "bustling", "nestled", "realm", "embark", "embarking", "thoughtful", "meaningful", "steady"],
-  1: ["additionally", "furthermore", "moreover", "crucial", "comprehensive", "enhance", "enhancing", "landscape", "navigate", "navigating", "leverage", "leveraging", "valuable", "insights", "profound", "ultimately", "showcase", "underscore", "significant", "essential", "unique", "overall"]
+  2: ["pivotal", "fostering", "fosters", "vibrant", "enduring", "garnered", "bolstered", "seamless", "seamlessly", "invaluable", "transformative", "resonate", "resonates", "grappling", "nuanced", "notably", "commendable", "palpable", "bustling", "nestled", "realm", "embark", "embarking", "thoughtful", "meaningful", "steady", "solace", "newfound", "embarked", "resilience"],
+  1: ["additionally", "furthermore", "moreover", "crucial", "comprehensive", "enhance", "enhancing", "landscape", "navigate", "navigating", "leverage", "leveraging", "valuable", "insights", "profound", "ultimately", "showcase", "underscore", "significant", "essential", "unique", "overall", "amidst"]
 };
 // [regex, weight, label]
 const AI_PHRASES = [
@@ -78,7 +78,8 @@ const AI_PHRASES = [
   ["(?:profound|lasting|far-reaching) (?:impact|effects?|implications?)", 2, "importance puffery"],
   ["moral imperative|timeless (?:exploration|tale|story|classic)", 3, "importance puffery"],
   ["may provide|not necessarily|does not (?:establish|guarantee)", 1.5, "hedge phrase (GPT-6 era)"],
-  ["perhaps the most|one of the (?:most|best) [\\w'-]+ (?:about|in|of)", 1.5, "superlative framing"]
+  ["perhaps the most|one of the (?:most|best) [\\w'-]+ (?:about|in|of)", 1.5, "superlative framing"],
+  ["i hope this (?:helps|was helpful|gives you)|hope that helps\\b", 2.5, "chatbot-style sign-off (people say it too)"]
 ];
 // Fiction habits (Pangram: "for a long moment", "said quietly", "felt something", "paused", "stared" rose in Opus 5.5)
 const FICTION = [
@@ -103,7 +104,6 @@ const NOT_PARTICIPLES = new Set(["nothing", "something", "anything", "everything
 const HARD = [
   ["as an ai(?: language)? model|i(?:'m| am) (?:just )?an ai\\b|as a (?:large )?language model", "chatbot self-reference"],
   ["as of my (?:last |latest )?(?:knowledge )?(?:cutoff|cut-off|update|training)", "knowledge-cutoff disclaimer"],
-  ["i hope this (?:helps|was helpful|gives you)|hope that helps\\b", "chatbot sign-off"],
   ["(?:let me know|feel free to (?:ask|let me know)) if you(?:'d| would)? (?:like|want) me to", "chatbot sign-off"],
   ["would you like me to (?:expand|elaborate|revise|adjust|make|add|write|tailor|help|turn|draft|create)", "chatbot offer"],
   ["if you(?:'d)? (?:want|like),? i can (?:also )?(?:turn|make|write|draft|expand|tailor|create|give|help|put)", "chatbot offer (ChatGPT-style)"],
@@ -112,7 +112,7 @@ const HARD = [
   ["here(?:'s| is) (?:a |an |the |your )?(?:revised|rewritten|polished|improved|refined|updated|reworded|shorter|longer) (?:version|draft|essay|paragraph)", "chatbot hand-off"],
   ["\\[(?:your |insert |recipient|company name|student name|teacher|name of|date of|today)[^\\]]{0,30}\\]", "unfilled placeholder"],
   ["oaicite|contentreference|turn0(?:search|news|view)\\d*|utm_source=chatgpt\\.com|【\\d+[^】]{0,20}】", "chatbot citation code"],
-  ["regenerate response|copy code\\b", "pasted chat interface text"]
+  ["regenerate response|(?:^|\\n)[ \\t]*copy code[ \\t]*(?=\\n|$)", "pasted chat interface text"]
 ];
 
 // ---------- 3. Attribution fingerprints ----------
@@ -200,7 +200,9 @@ function features(text) {
 
   // measured AI words
   let vocab = 0, vocabN = 0;
-  scan(WORD_RE, m => { vocab += WORD_WEIGHT.get(m[1].toLowerCase()) || 1; vocabN++; add(m.index, m.index + m[0].length, "word", "word AI over-uses (measured)"); });
+  // each word counts at most twice, and everyday tier-1 words (common in student essays) count half
+  const seenWord = {};
+  scan(WORD_RE, m => { const lw = m[1].toLowerCase(); seenWord[lw] = (seenWord[lw] || 0) + 1; if (seenWord[lw] <= 2) { const wt = WORD_WEIGHT.get(lw) || 1; vocab += wt === 1 ? 0.5 : wt; } vocabN++; add(m.index, m.index + m[0].length, "word", "word AI over-uses (measured)"); });
 
   // stock phrases
   let phrase = 0, phraseN = 0;
@@ -225,7 +227,8 @@ function features(text) {
 
   // trailing -ing clauses
   let part = 0;
-  scan(/,\s+([a-z]+ing)\b/g, m => { if (!NOT_PARTICIPLES.has(m[1])) { part++; add(m.index + m[0].length - m[1].length, m.index + m[0].length, "struct", "trailing -ing clause"); } });
+  // lists of -ing words ("reading, writing and drawing") don't count: people write those all the time
+  scan(/([A-Za-z]+),\s+([a-z]+ing)\b(?!\s*(?:,|and\b|or\b))/g, m => { if (!NOT_PARTICIPLES.has(m[2]) && !/ing$/i.test(m[1])) { part++; add(m.index + m[0].length - m[2].length, m.index + m[0].length, "struct", "trailing -ing clause"); } });
 
   // rule of three lists
   let tri = 0; scan(/\b[\w'-]+(?: [\w'-]+){0,2}, [\w'-]+(?: [\w'-]+){0,2},? (?:and|or) [\w'-]+/g, () => tri++);
@@ -234,7 +237,7 @@ function features(text) {
   let trans = 0;
   scan(new RegExp("(^|[.!?][\"')\\]]?\\s+|\\n)(" + TRANSITIONS.map(escRe).join("|") + ")\\b", "gi"), m => { trans++; const s = m.index + m[1].length; add(s, s + m[2].length, "trans", "formal transition opener"); });
 
-  // summary closers in the last 25% of the text
+  // summary closers in the last 30% of the text
   let summ = 0;
   const tailStart = Math.floor(text.length * 0.7);
   scan(/(?:^|[.!?]\s+|\n)(in short|in summary|to sum up|in conclusion|overall|the bottom line|tl;dr|all in all|in essence|to summari[sz]e)\b/gi, m => { const s = m.index + m[0].length - m[1].length; if (s >= tailStart) { summ = 1; add(s, s + m[1].length, "struct", "summary closer"); } });
@@ -243,7 +246,8 @@ function features(text) {
   let fiction = 0; scan(FICTION_RE, m => { fiction++; add(m.index, m.index + m[0].length, "phrase", "fiction cliché"); });
   // tidy hopeful ending (last sentence)
   const lastS = (sents[sents.length - 1] || "").toLowerCase();
-  const hopeEnd = /\b(?:for the first time|began to (?:smile|laugh|hope|heal|believe)|smiled|finally (?:felt|knew|understood)|maybe(?:,)? (?:that|this) was enough|was (?:a|the) (?:start|beginning)|(?:felt|feel) like home|hope\b|together\b|light\b|took (?:a|one) (?:step|breath)|began to read|whatever came next)\b/.test(lastS) ? 1 : 0;
+  const narrative = fiction > 0 || (text.match(/"[^"\n]{3,}"/g) || []).length >= 2;
+  const hopeEnd = narrative && /\b(?:for the first time|began to (?:smile|laugh|hope|heal|believe)|smiled|finally (?:felt|knew|understood)|maybe(?:,)? (?:that|this) was enough|was (?:a|the) (?:start|beginning)|(?:felt|feel) like home|hope\b|together\b|light\b|took (?:a|one) (?:step|breath)|began to read|whatever came next)\b/.test(lastS) ? 1 : 0;
 
   // email boilerplate
   let eopen = 0, eclose = 0;
@@ -261,7 +265,9 @@ function features(text) {
   const dashes = (text.match(/—|\s–\s/g) || []).length;
   const lines = text.split("\n").filter(l => l.trim());
   const bullets = lines.filter(l => /^\s*(?:[-*•]|\d+[.)])\s+\S/.test(l)).length;
-  const headings = lines.filter(l => /^#{1,4}\s+\S/.test(l) || (/^[A-Z][^.!?]{2,60}$/.test(l.trim()) && l.trim().split(/\s+/).length <= 8 && lines.length > 3 && /^(?:[A-Z][\w'-]*\s?)+$/.test(l.trim()))).length;
+  // "Introduction:" / "Body Paragraph 1:" / "Conclusion:" labels, which ChatGPT puts on essays
+  const sectionLabels = lines.filter(l => /^\s*(?:introduction|conclusion|body(?: paragraphs?)?(?: \d+)?|thesis(?: statement)?|title)\s*:/i.test(l)).length;
+  const headings = sectionLabels + lines.filter(l => /^#{1,4}\s+\S/.test(l) || (/^[A-Z][^.!?]{2,60}$/.test(l.trim()) && l.trim().split(/\s+/).length <= 8 && lines.length > 3 && /^(?:[A-Z][\w'-]*\s?)+$/.test(l.trim()))).length;
   const bolds = (text.match(/\*\*[^*\n]{2,60}\*\*/g) || []).length;
   const boldLabels = lines.filter(l => /^\s*(?:[-*•]|\d+[.)])?\s*\*\*[^*\n]{1,40}:?\*\*:?/.test(l)).length;
   const emoji = (text.match(/[\u{1F300}-\u{1FAFF}\u{2705}\u{2728}\u{274C}\u{2B50}]/gu) || []).length;
@@ -308,7 +314,8 @@ function features(text) {
   // composites
   const even = (lens.length >= 6 && cv < 0.38 ? 0.5 : 0) + (paras.length >= 3 && paraCv < 0.22 ? 0.3 : 0) + (excl === 0 && slipsN === 0 && wc >= 120 ? 0.2 : 0);
   // casual-sounding but suspiciously clean and generic (the "write like a teen" case)
-  const tooClean = (casual + slang >= 2 || contr >= 4) && slipsN === 0 && lens.length >= 6 && cv < 0.55 && (wrap || hopeEnd || lowSpec) ? 1 : 0;
+  const casualStrong = (lower.match(/\b(?:honestly|like,|kind of|sort of|pretty much|i guess|i reckon|you know|basically|literally|to be honest|whatever)\b/g) || []).length;
+  const tooClean = (casualStrong + slang >= 2 || (contr >= 4 && casualStrong + slang >= 1)) && slipsN === 0 && lens.length >= 6 && cv < 0.55 && (wrap || hopeEnd) ? 1 : 0;
 
   return {
     wc, ns, hits, sents,
@@ -327,12 +334,16 @@ function features(text) {
 }
 
 // ---------- 5. Scoring model ----------
-// Logistic model. Weights hand-set from the research, then checked on a labelled set so that
-// absence-of-style clues (no names, even rhythm) can never push a text high on their own.
-const MODEL = { bias: -1.9, w: {
-  hard: 2.5, vocab: 0.4, phrase: 0.55, negpar: 2.5, frame: 3.0, part: 2.3, tri: 0.6, trans: 2.8,
-  summ: 0.6, fiction: 0.9, hopeEnd: 0.3, email: 0.5, hedge: 0.12, vague: 1.2, praise: 0.25,
-  colon: 0.15, dash: 0.25, fmt: 0.3, cv: -1.0, extreme: -2.2, slips: -0.9, wrap: 0.8, lowSpec: 0.35, even: 0.6, tooClean: 1.0
+// Logistic model. Weights were first hand-set from the research, then (v5) re-fitted on real text:
+// 1,000+ human texts (student essays, Reddit stories, news, English-learner essays) and real
+// ChatGPT/Claude output from the Ghostbuster dataset, plus this repo's own corpus. The fit counted
+// each human text 3x and kept every clue's direction. The final weights are 70% hand-set + 30% fitted
+// (so they don't over-fit 2023-era chatbots), with the bias set so fewer humans are flagged than in v4.
+// See tests/eval_ghostbuster.js.
+const MODEL = { bias: -2.0, w: {
+  hard: 2.5, vocab: 0.59, phrase: 0.62, negpar: 2.49, frame: 3.0, part: 2.36, tri: 0.62, trans: 2.78,
+  summ: 0.65, fiction: 0.97, hopeEnd: 0.34, email: 0.56, hedge: 0.08, vague: 1.21, praise: 0.27,
+  colon: 0.14, dash: 0.29, fmt: 0.28, cv: -1.0, extreme: -2.21, slips: -0.87, wrap: 0.86, lowSpec: 0.27, even: 0.68, tooClean: 1.01
 }, cap: { hard: 3, vocab: 6, phrase: 6, negpar: 0.5, frame: 0.5, part: 0.6, tri: 0.6, trans: 0.5, fiction: 3, email: 4, hedge: 6, vague: 2, praise: 6, colon: 3, dash: 3, fmt: 6, slips: 6 } };
 
 function scoreFeatures(f) {

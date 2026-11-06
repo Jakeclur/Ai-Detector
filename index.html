@@ -107,7 +107,7 @@
   <h1>AI Text Detector</h1>
   <p class="sub">See how many known AI-writing habits a text shows, which chatbot it looks more like, and where the AI-like parts are. You can also compare it with someone's known writing, or test the detector on your own examples.</p>
 
-  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In testing it flagged none of 216 human-written passages, but it caught only about half of the AI-written ones: AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
+  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In tests on over 2,000 real human texts (including essays by people learning English) it wrongly flagged about 1 in 200, and it caught only about 1 in 4 real chatbot texts. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
 
   <div class="tabs">
     <button class="tab on" data-tab="check">Check a text</button>
@@ -253,20 +253,23 @@ a Claude answer goes here…</pre>
 
   <details>
     <summary>How accurate is it?</summary>
-    <p><b>Detection.</b> I tested it on 216 human-written passages (programming documentation, package READMEs, Newton's <i>Opticks</i>, the GPL licence, classic novels and speeches) and 53 AI-written passages in five styles. Part of the AI set was kept back and only used for checking. Results at the 55 cut-off:</p>
-    <table>
+    <p><b>Real-world test.</b> I tested it on 2,056 real human texts and 1,800 real chatbot texts from the <a href="https://github.com/vivek3141/ghostbuster-data">Ghostbuster dataset</a>: student essays, Reddit short stories, Reuters news articles and essays by people learning English, plus ChatGPT and Claude (2023 versions) writing on the same topics. Half of it was kept back and only used for the final check. Results at the 55 cut-off:</p>
+    <div class="tablewrap"><table>
       <tr><th>Kind of text</th><th class="n">Flagged as AI</th></tr>
-      <tr><td>Human-written (216 passages, plus 9 everyday-style ones)</td><td class="n">0% (4% landed in "inconclusive")</td></tr>
-      <tr><td>AI, classic ChatGPT essay style</td><td class="n">100%</td></tr>
-      <tr><td>AI, modern chatbot answers</td><td class="n">about 55%</td></tr>
-      <tr><td>AI, short stories</td><td class="n">about 40%</td></tr>
-      <tr><td>AI, emails and posts</td><td class="n">about 15%</td></tr>
-      <tr><td>AI told to sound like a teenager</td><td class="n">about 10%</td></tr>
-      <tr><td>Any text with leftover chatbot lines ("I hope this helps", "[Your Name]", citation codes)</td><td class="n">nearly always</td></tr>
-    </table>
-    <p><b>Big caveat:</b> every AI passage was written by one AI (Claude), and the "ChatGPT-style" ones are imitations, not real ChatGPT output. The everyday "human" passages in the sample set were also written by Claude imitating people. The real human texts are mostly formal or old, with no genuine teenage or casual writing. Use the Test lab with real examples to find out how it does for you.</p>
-    <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. It never named the wrong one, but that's a tiny test on imitations, so treat it as a hint.</p>
-    <p><b>Mixed texts:</b> in a test essay made of three human paragraphs and one pasted AI paragraph, the whole essay scored 25 and was labelled "Mixed", while the AI paragraph's section scored 67 and the sliding window reached 76. No stretch of human text in the test set scored above 39.</p>
+      <tr><td>Human: student essays (299)</td><td class="n">6 (2%)</td></tr>
+      <tr><td>Human: essays by English learners (1,157)</td><td class="n">4 (0.3%)</td></tr>
+      <tr><td>Human: short stories and news (600)</td><td class="n">0</td></tr>
+      <tr><td>ChatGPT: essays</td><td class="n">81%</td></tr>
+      <tr><td>ChatGPT: stories</td><td class="n">35%</td></tr>
+      <tr><td>ChatGPT: news articles</td><td class="n">7%</td></tr>
+      <tr><td>Claude (2023): essays</td><td class="n">23%</td></tr>
+      <tr><td>Claude (2023): stories and news</td><td class="n">2%</td></tr>
+    </table></div>
+    <p>Compared with the previous version, this one wrongly flags about half as many people (10 instead of 19) and catches a few more chatbot texts (450 instead of 418), and it did better on both counts on the half that was kept back.</p>
+    <p><b>Own test set</b> (newer chatbot styles, all written by Claude): 0 of 216 human passages flagged; AI caught: classic ChatGPT-style essays 100%, modern answers about 33%, stories about 25%, emails about 13%, AI told to sound like a teenager about 10%. Any text with leftover chatbot lines ("As an AI language model", "[Your Name]", citation codes) is nearly always caught.</p>
+    <p><b>Big caveat:</b> the real chatbot text is from 2023 models, which write differently from today's. The newer-style samples were all written by one AI (Claude), and the "ChatGPT-style" ones are imitations. Use the Test lab with your own real examples to find out how it does for you.</p>
+    <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. On real 2023 Claude essays it sometimes said "ChatGPT-leaning" and never "Claude-leaning", because its Claude clues come from 2026 Claude versions. Treat it as a hint.</p>
+    <p><b>Mixed texts:</b> in a test essay made of three human paragraphs and one pasted AI paragraph, the whole essay scored 22 and was labelled "Mixed", while the AI paragraph's section scored 68 and the sliding window reached 71.</p>
     <p>Tools that run a real language model do much better. Pangram reports catching 99.7% of Claude Opus 5.5 answers. A page like this can't run such a model, and I haven't added one because I couldn't test it here.</p>
   </details>
 
@@ -293,7 +296,7 @@ a Claude answer goes here…</pre>
 <script>
 // ==CORE==
 /* =====================================================================
-   AI Text Detector engine (v4). Rules only: no model, no network.
+   AI Text Detector engine (v5). Rules only: no trained text model, no network.
    Evidence sources (see the page's "research" section):
    - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
    - Reinhart et al., PNAS 2025 (participial clauses etc.)
@@ -328,8 +331,8 @@ function cleanText(raw) {
 // Words with MEASURED over-use vs human writing (not blog lists). weight ~ strength.
 const AI_WORDS = {
   3: ["delve", "delves", "delved", "delving", "tapestry", "camaraderie", "intricate", "intricacies", "underscores", "underscored", "underscoring", "showcasing", "showcases", "testament", "meticulous", "meticulously", "interplay", "unwavering", "multifaceted", "ever-evolving", "dependable"],
-  2: ["pivotal", "fostering", "fosters", "vibrant", "enduring", "garnered", "bolstered", "seamless", "seamlessly", "invaluable", "transformative", "resonate", "resonates", "grappling", "nuanced", "notably", "commendable", "palpable", "bustling", "nestled", "realm", "embark", "embarking", "thoughtful", "meaningful", "steady"],
-  1: ["additionally", "furthermore", "moreover", "crucial", "comprehensive", "enhance", "enhancing", "landscape", "navigate", "navigating", "leverage", "leveraging", "valuable", "insights", "profound", "ultimately", "showcase", "underscore", "significant", "essential", "unique", "overall"]
+  2: ["pivotal", "fostering", "fosters", "vibrant", "enduring", "garnered", "bolstered", "seamless", "seamlessly", "invaluable", "transformative", "resonate", "resonates", "grappling", "nuanced", "notably", "commendable", "palpable", "bustling", "nestled", "realm", "embark", "embarking", "thoughtful", "meaningful", "steady", "solace", "newfound", "embarked", "resilience"],
+  1: ["additionally", "furthermore", "moreover", "crucial", "comprehensive", "enhance", "enhancing", "landscape", "navigate", "navigating", "leverage", "leveraging", "valuable", "insights", "profound", "ultimately", "showcase", "underscore", "significant", "essential", "unique", "overall", "amidst"]
 };
 // [regex, weight, label]
 const AI_PHRASES = [
@@ -371,7 +374,8 @@ const AI_PHRASES = [
   ["(?:profound|lasting|far-reaching) (?:impact|effects?|implications?)", 2, "importance puffery"],
   ["moral imperative|timeless (?:exploration|tale|story|classic)", 3, "importance puffery"],
   ["may provide|not necessarily|does not (?:establish|guarantee)", 1.5, "hedge phrase (GPT-6 era)"],
-  ["perhaps the most|one of the (?:most|best) [\\w'-]+ (?:about|in|of)", 1.5, "superlative framing"]
+  ["perhaps the most|one of the (?:most|best) [\\w'-]+ (?:about|in|of)", 1.5, "superlative framing"],
+  ["i hope this (?:helps|was helpful|gives you)|hope that helps\\b", 2.5, "chatbot-style sign-off (people say it too)"]
 ];
 // Fiction habits (Pangram: "for a long moment", "said quietly", "felt something", "paused", "stared" rose in Opus 5.5)
 const FICTION = [
@@ -396,7 +400,6 @@ const NOT_PARTICIPLES = new Set(["nothing", "something", "anything", "everything
 const HARD = [
   ["as an ai(?: language)? model|i(?:'m| am) (?:just )?an ai\\b|as a (?:large )?language model", "chatbot self-reference"],
   ["as of my (?:last |latest )?(?:knowledge )?(?:cutoff|cut-off|update|training)", "knowledge-cutoff disclaimer"],
-  ["i hope this (?:helps|was helpful|gives you)|hope that helps\\b", "chatbot sign-off"],
   ["(?:let me know|feel free to (?:ask|let me know)) if you(?:'d| would)? (?:like|want) me to", "chatbot sign-off"],
   ["would you like me to (?:expand|elaborate|revise|adjust|make|add|write|tailor|help|turn|draft|create)", "chatbot offer"],
   ["if you(?:'d)? (?:want|like),? i can (?:also )?(?:turn|make|write|draft|expand|tailor|create|give|help|put)", "chatbot offer (ChatGPT-style)"],
@@ -405,7 +408,7 @@ const HARD = [
   ["here(?:'s| is) (?:a |an |the |your )?(?:revised|rewritten|polished|improved|refined|updated|reworded|shorter|longer) (?:version|draft|essay|paragraph)", "chatbot hand-off"],
   ["\\[(?:your |insert |recipient|company name|student name|teacher|name of|date of|today)[^\\]]{0,30}\\]", "unfilled placeholder"],
   ["oaicite|contentreference|turn0(?:search|news|view)\\d*|utm_source=chatgpt\\.com|【\\d+[^】]{0,20}】", "chatbot citation code"],
-  ["regenerate response|copy code\\b", "pasted chat interface text"]
+  ["regenerate response|(?:^|\\n)[ \\t]*copy code[ \\t]*(?=\\n|$)", "pasted chat interface text"]
 ];
 
 // ---------- 3. Attribution fingerprints ----------
@@ -493,7 +496,9 @@ function features(text) {
 
   // measured AI words
   let vocab = 0, vocabN = 0;
-  scan(WORD_RE, m => { vocab += WORD_WEIGHT.get(m[1].toLowerCase()) || 1; vocabN++; add(m.index, m.index + m[0].length, "word", "word AI over-uses (measured)"); });
+  // each word counts at most twice, and everyday tier-1 words (common in student essays) count half
+  const seenWord = {};
+  scan(WORD_RE, m => { const lw = m[1].toLowerCase(); seenWord[lw] = (seenWord[lw] || 0) + 1; if (seenWord[lw] <= 2) { const wt = WORD_WEIGHT.get(lw) || 1; vocab += wt === 1 ? 0.5 : wt; } vocabN++; add(m.index, m.index + m[0].length, "word", "word AI over-uses (measured)"); });
 
   // stock phrases
   let phrase = 0, phraseN = 0;
@@ -518,7 +523,8 @@ function features(text) {
 
   // trailing -ing clauses
   let part = 0;
-  scan(/,\s+([a-z]+ing)\b/g, m => { if (!NOT_PARTICIPLES.has(m[1])) { part++; add(m.index + m[0].length - m[1].length, m.index + m[0].length, "struct", "trailing -ing clause"); } });
+  // lists of -ing words ("reading, writing and drawing") don't count: people write those all the time
+  scan(/([A-Za-z]+),\s+([a-z]+ing)\b(?!\s*(?:,|and\b|or\b))/g, m => { if (!NOT_PARTICIPLES.has(m[2]) && !/ing$/i.test(m[1])) { part++; add(m.index + m[0].length - m[2].length, m.index + m[0].length, "struct", "trailing -ing clause"); } });
 
   // rule of three lists
   let tri = 0; scan(/\b[\w'-]+(?: [\w'-]+){0,2}, [\w'-]+(?: [\w'-]+){0,2},? (?:and|or) [\w'-]+/g, () => tri++);
@@ -527,7 +533,7 @@ function features(text) {
   let trans = 0;
   scan(new RegExp("(^|[.!?][\"')\\]]?\\s+|\\n)(" + TRANSITIONS.map(escRe).join("|") + ")\\b", "gi"), m => { trans++; const s = m.index + m[1].length; add(s, s + m[2].length, "trans", "formal transition opener"); });
 
-  // summary closers in the last 25% of the text
+  // summary closers in the last 30% of the text
   let summ = 0;
   const tailStart = Math.floor(text.length * 0.7);
   scan(/(?:^|[.!?]\s+|\n)(in short|in summary|to sum up|in conclusion|overall|the bottom line|tl;dr|all in all|in essence|to summari[sz]e)\b/gi, m => { const s = m.index + m[0].length - m[1].length; if (s >= tailStart) { summ = 1; add(s, s + m[1].length, "struct", "summary closer"); } });
@@ -536,7 +542,8 @@ function features(text) {
   let fiction = 0; scan(FICTION_RE, m => { fiction++; add(m.index, m.index + m[0].length, "phrase", "fiction cliché"); });
   // tidy hopeful ending (last sentence)
   const lastS = (sents[sents.length - 1] || "").toLowerCase();
-  const hopeEnd = /\b(?:for the first time|began to (?:smile|laugh|hope|heal|believe)|smiled|finally (?:felt|knew|understood)|maybe(?:,)? (?:that|this) was enough|was (?:a|the) (?:start|beginning)|(?:felt|feel) like home|hope\b|together\b|light\b|took (?:a|one) (?:step|breath)|began to read|whatever came next)\b/.test(lastS) ? 1 : 0;
+  const narrative = fiction > 0 || (text.match(/"[^"\n]{3,}"/g) || []).length >= 2;
+  const hopeEnd = narrative && /\b(?:for the first time|began to (?:smile|laugh|hope|heal|believe)|smiled|finally (?:felt|knew|understood)|maybe(?:,)? (?:that|this) was enough|was (?:a|the) (?:start|beginning)|(?:felt|feel) like home|hope\b|together\b|light\b|took (?:a|one) (?:step|breath)|began to read|whatever came next)\b/.test(lastS) ? 1 : 0;
 
   // email boilerplate
   let eopen = 0, eclose = 0;
@@ -554,7 +561,9 @@ function features(text) {
   const dashes = (text.match(/—|\s–\s/g) || []).length;
   const lines = text.split("\n").filter(l => l.trim());
   const bullets = lines.filter(l => /^\s*(?:[-*•]|\d+[.)])\s+\S/.test(l)).length;
-  const headings = lines.filter(l => /^#{1,4}\s+\S/.test(l) || (/^[A-Z][^.!?]{2,60}$/.test(l.trim()) && l.trim().split(/\s+/).length <= 8 && lines.length > 3 && /^(?:[A-Z][\w'-]*\s?)+$/.test(l.trim()))).length;
+  // "Introduction:" / "Body Paragraph 1:" / "Conclusion:" labels, which ChatGPT puts on essays
+  const sectionLabels = lines.filter(l => /^\s*(?:introduction|conclusion|body(?: paragraphs?)?(?: \d+)?|thesis(?: statement)?|title)\s*:/i.test(l)).length;
+  const headings = sectionLabels + lines.filter(l => /^#{1,4}\s+\S/.test(l) || (/^[A-Z][^.!?]{2,60}$/.test(l.trim()) && l.trim().split(/\s+/).length <= 8 && lines.length > 3 && /^(?:[A-Z][\w'-]*\s?)+$/.test(l.trim()))).length;
   const bolds = (text.match(/\*\*[^*\n]{2,60}\*\*/g) || []).length;
   const boldLabels = lines.filter(l => /^\s*(?:[-*•]|\d+[.)])?\s*\*\*[^*\n]{1,40}:?\*\*:?/.test(l)).length;
   const emoji = (text.match(/[\u{1F300}-\u{1FAFF}\u{2705}\u{2728}\u{274C}\u{2B50}]/gu) || []).length;
@@ -601,7 +610,8 @@ function features(text) {
   // composites
   const even = (lens.length >= 6 && cv < 0.38 ? 0.5 : 0) + (paras.length >= 3 && paraCv < 0.22 ? 0.3 : 0) + (excl === 0 && slipsN === 0 && wc >= 120 ? 0.2 : 0);
   // casual-sounding but suspiciously clean and generic (the "write like a teen" case)
-  const tooClean = (casual + slang >= 2 || contr >= 4) && slipsN === 0 && lens.length >= 6 && cv < 0.55 && (wrap || hopeEnd || lowSpec) ? 1 : 0;
+  const casualStrong = (lower.match(/\b(?:honestly|like,|kind of|sort of|pretty much|i guess|i reckon|you know|basically|literally|to be honest|whatever)\b/g) || []).length;
+  const tooClean = (casualStrong + slang >= 2 || (contr >= 4 && casualStrong + slang >= 1)) && slipsN === 0 && lens.length >= 6 && cv < 0.55 && (wrap || hopeEnd) ? 1 : 0;
 
   return {
     wc, ns, hits, sents,
@@ -620,12 +630,16 @@ function features(text) {
 }
 
 // ---------- 5. Scoring model ----------
-// Logistic model. Weights hand-set from the research, then checked on a labelled set so that
-// absence-of-style clues (no names, even rhythm) can never push a text high on their own.
-const MODEL = { bias: -1.9, w: {
-  hard: 2.5, vocab: 0.4, phrase: 0.55, negpar: 2.5, frame: 3.0, part: 2.3, tri: 0.6, trans: 2.8,
-  summ: 0.6, fiction: 0.9, hopeEnd: 0.3, email: 0.5, hedge: 0.12, vague: 1.2, praise: 0.25,
-  colon: 0.15, dash: 0.25, fmt: 0.3, cv: -1.0, extreme: -2.2, slips: -0.9, wrap: 0.8, lowSpec: 0.35, even: 0.6, tooClean: 1.0
+// Logistic model. Weights were first hand-set from the research, then (v5) re-fitted on real text:
+// 1,000+ human texts (student essays, Reddit stories, news, English-learner essays) and real
+// ChatGPT/Claude output from the Ghostbuster dataset, plus this repo's own corpus. The fit counted
+// each human text 3x and kept every clue's direction. The final weights are 70% hand-set + 30% fitted
+// (so they don't over-fit 2023-era chatbots), with the bias set so fewer humans are flagged than in v4.
+// See tests/eval_ghostbuster.js.
+const MODEL = { bias: -2.0, w: {
+  hard: 2.5, vocab: 0.59, phrase: 0.62, negpar: 2.49, frame: 3.0, part: 2.36, tri: 0.62, trans: 2.78,
+  summ: 0.65, fiction: 0.97, hopeEnd: 0.34, email: 0.56, hedge: 0.08, vague: 1.21, praise: 0.27,
+  colon: 0.14, dash: 0.29, fmt: 0.28, cv: -1.0, extreme: -2.21, slips: -0.87, wrap: 0.86, lowSpec: 0.27, even: 0.68, tooClean: 1.01
 }, cap: { hard: 3, vocab: 6, phrase: 6, negpar: 0.5, frame: 0.5, part: 0.6, tri: 0.6, trans: 0.5, fiction: 3, email: 4, hedge: 6, vague: 2, praise: 6, colon: 3, dash: 3, fmt: 6, slips: 6 } };
 
 function scoreFeatures(f) {
@@ -815,7 +829,9 @@ if (typeof document !== "undefined") {
   async function readDocx(file) {
     if (typeof JSZip === "undefined") throw new Error("The .docx reader didn't load. Copy and paste the text instead.");
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const xml = await zip.file("word/document.xml").async("string");
+    const part = zip.file("word/document.xml");
+    if (!part) throw new Error("That doesn't look like a Word document. Copy and paste the text instead.");
+    const xml = await part.async("string");
     const doc = new DOMParser().parseFromString(xml, "application/xml");
     const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     return [...doc.getElementsByTagNameNS(W, "p")].map(p => {
@@ -941,6 +957,9 @@ if (typeof document !== "undefined") {
   function run() {
     const msg = $("msg"); msg.className = "msg"; msg.textContent = "";
     const r = fullAnalysis($("input").value);
+    // words in other alphabets (Cyrillic, Greek, Chinese…) aren't counted as English words
+    const anyWords = ($("input").value.match(/\p{L}[\p{L}\p{M}'-]*/gu) || []).length;
+    if (r.tooShort && anyWords >= 40) { $("result").classList.add("hide"); msg.className = "msg info"; msg.textContent = "This doesn't look like English. The checker only knows English writing habits, so it can't score this text."; return; }
     if (r.tooShort) { $("result").classList.add("hide"); msg.textContent = `Only ${plural(r.wc, "word")}. There's too little to go on, so please paste at least 40 (150+ is better).`; return; }
     if (r.english < 20) { msg.className = "msg info"; msg.textContent = "This doesn't look like English. The checker only knows English writing habits, so this score means very little."; }
     $("result").classList.remove("hide");
@@ -1063,7 +1082,8 @@ if (typeof document !== "undefined") {
       const flagged = r.score >= cut;
       const isAI = label !== "Human" && label !== "Unlabelled";
       const det = label === "Unlabelled" ? null : (isAI ? flagged : !flagged);
-      const lean = r.attr.lean;
+      // the model guess is only shown (and only judged) when the text looks AI-like enough
+      const lean = r.score >= 45 || r.counts.hard ? r.attr.lean : "unclear";
       const mdl = (label === "Claude" || label === "ChatGPT") ? (lean === "unclear" ? "?" : (lean === label.toLowerCase())) : null;
       rows.push({ i: i + 1, label, wc: r.wc, score: r.score, band: r.band, lean, conf: r.attr.confidence, det, mdl, preview: text.replace(/\s+/g, " ").slice(0, 70) });
     });

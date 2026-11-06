@@ -21,8 +21,9 @@ for (const blk of raw.split(/\n\s*-{3,}\s*\n/)) {
   const a = E.attribute(text, r);
   const isAI = !["Human", "Unlabelled"].includes(label);
   const det = label === "Unlabelled" ? "" : (isAI ? r.score >= cut : r.score < cut) ? "ok" : "WRONG";
-  const mdl = ["Claude", "ChatGPT"].includes(label) ? (a.lean === "unclear" ? "can't tell" : a.lean === label.toLowerCase() ? "ok" : "WRONG") : "";
-  rows.push({ label, wc: r.wc, score: r.score, band: r.band, lean: a.lean, conf: a.confidence, det, mdl, start: text.replace(/\s+/g, " ").slice(0, 45) });
+  const lean = r.score >= 45 || r.counts.hard ? a.lean : "unclear";   // same rule as the page
+  const mdl = ["Claude", "ChatGPT"].includes(label) ? (lean === "unclear" ? "can't tell" : lean === label.toLowerCase() ? "ok" : "WRONG") : "";
+  rows.push({ label, wc: r.wc, score: r.score, band: r.band, lean, conf: a.confidence, det, mdl, start: text.replace(/\s+/g, " ").slice(0, 45) });
 }
 console.log("label    words score band          looks-like        detected model      start");
 for (const r of rows) {

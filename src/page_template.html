@@ -107,7 +107,7 @@
   <h1>AI Text Detector</h1>
   <p class="sub">See how many known AI-writing habits a text shows, which chatbot it looks more like, and where the AI-like parts are. You can also compare it with someone's known writing, or test the detector on your own examples.</p>
 
-  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In testing it flagged none of 216 human-written passages, but it caught only about half of the AI-written ones: AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
+  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In tests on over 2,000 real human texts (including essays by people learning English) it wrongly flagged about 1 in 200, and it caught only about 1 in 4 real chatbot texts. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
 
   <div class="tabs">
     <button class="tab on" data-tab="check">Check a text</button>
@@ -253,20 +253,23 @@ a Claude answer goes here…</pre>
 
   <details>
     <summary>How accurate is it?</summary>
-    <p><b>Detection.</b> I tested it on 216 human-written passages (programming documentation, package READMEs, Newton's <i>Opticks</i>, the GPL licence, classic novels and speeches) and 53 AI-written passages in five styles. Part of the AI set was kept back and only used for checking. Results at the 55 cut-off:</p>
-    <table>
+    <p><b>Real-world test.</b> I tested it on 2,056 real human texts and 1,800 real chatbot texts from the <a href="https://github.com/vivek3141/ghostbuster-data">Ghostbuster dataset</a>: student essays, Reddit short stories, Reuters news articles and essays by people learning English, plus ChatGPT and Claude (2023 versions) writing on the same topics. Half of it was kept back and only used for the final check. Results at the 55 cut-off:</p>
+    <div class="tablewrap"><table>
       <tr><th>Kind of text</th><th class="n">Flagged as AI</th></tr>
-      <tr><td>Human-written (216 passages, plus 9 everyday-style ones)</td><td class="n">0% (4% landed in "inconclusive")</td></tr>
-      <tr><td>AI, classic ChatGPT essay style</td><td class="n">100%</td></tr>
-      <tr><td>AI, modern chatbot answers</td><td class="n">about 55%</td></tr>
-      <tr><td>AI, short stories</td><td class="n">about 40%</td></tr>
-      <tr><td>AI, emails and posts</td><td class="n">about 15%</td></tr>
-      <tr><td>AI told to sound like a teenager</td><td class="n">about 10%</td></tr>
-      <tr><td>Any text with leftover chatbot lines ("I hope this helps", "[Your Name]", citation codes)</td><td class="n">nearly always</td></tr>
-    </table>
-    <p><b>Big caveat:</b> every AI passage was written by one AI (Claude), and the "ChatGPT-style" ones are imitations, not real ChatGPT output. The everyday "human" passages in the sample set were also written by Claude imitating people. The real human texts are mostly formal or old, with no genuine teenage or casual writing. Use the Test lab with real examples to find out how it does for you.</p>
-    <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. It never named the wrong one, but that's a tiny test on imitations, so treat it as a hint.</p>
-    <p><b>Mixed texts:</b> in a test essay made of three human paragraphs and one pasted AI paragraph, the whole essay scored 25 and was labelled "Mixed", while the AI paragraph's section scored 67 and the sliding window reached 76. No stretch of human text in the test set scored above 39.</p>
+      <tr><td>Human: student essays (299)</td><td class="n">6 (2%)</td></tr>
+      <tr><td>Human: essays by English learners (1,157)</td><td class="n">4 (0.3%)</td></tr>
+      <tr><td>Human: short stories and news (600)</td><td class="n">0</td></tr>
+      <tr><td>ChatGPT: essays</td><td class="n">81%</td></tr>
+      <tr><td>ChatGPT: stories</td><td class="n">35%</td></tr>
+      <tr><td>ChatGPT: news articles</td><td class="n">7%</td></tr>
+      <tr><td>Claude (2023): essays</td><td class="n">23%</td></tr>
+      <tr><td>Claude (2023): stories and news</td><td class="n">2%</td></tr>
+    </table></div>
+    <p>Compared with the previous version, this one wrongly flags about half as many people (10 instead of 19) and catches a few more chatbot texts (450 instead of 418), and it did better on both counts on the half that was kept back.</p>
+    <p><b>Own test set</b> (newer chatbot styles, all written by Claude): 0 of 216 human passages flagged; AI caught: classic ChatGPT-style essays 100%, modern answers about 33%, stories about 25%, emails about 13%, AI told to sound like a teenager about 10%. Any text with leftover chatbot lines ("As an AI language model", "[Your Name]", citation codes) is nearly always caught.</p>
+    <p><b>Big caveat:</b> the real chatbot text is from 2023 models, which write differently from today's. The newer-style samples were all written by one AI (Claude), and the "ChatGPT-style" ones are imitations. Use the Test lab with your own real examples to find out how it does for you.</p>
+    <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. On real 2023 Claude essays it sometimes said "ChatGPT-leaning" and never "Claude-leaning", because its Claude clues come from 2026 Claude versions. Treat it as a hint.</p>
+    <p><b>Mixed texts:</b> in a test essay made of three human paragraphs and one pasted AI paragraph, the whole essay scored 22 and was labelled "Mixed", while the AI paragraph's section scored 68 and the sliding window reached 71.</p>
     <p>Tools that run a real language model do much better. Pangram reports catching 99.7% of Claude Opus 5.5 answers. A page like this can't run such a model, and I haven't added one because I couldn't test it here.</p>
   </details>
 
@@ -329,7 +332,9 @@ if (typeof document !== "undefined") {
   async function readDocx(file) {
     if (typeof JSZip === "undefined") throw new Error("The .docx reader didn't load. Copy and paste the text instead.");
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const xml = await zip.file("word/document.xml").async("string");
+    const part = zip.file("word/document.xml");
+    if (!part) throw new Error("That doesn't look like a Word document. Copy and paste the text instead.");
+    const xml = await part.async("string");
     const doc = new DOMParser().parseFromString(xml, "application/xml");
     const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     return [...doc.getElementsByTagNameNS(W, "p")].map(p => {
@@ -455,6 +460,9 @@ if (typeof document !== "undefined") {
   function run() {
     const msg = $("msg"); msg.className = "msg"; msg.textContent = "";
     const r = fullAnalysis($("input").value);
+    // words in other alphabets (Cyrillic, Greek, Chinese…) aren't counted as English words
+    const anyWords = ($("input").value.match(/\p{L}[\p{L}\p{M}'-]*/gu) || []).length;
+    if (r.tooShort && anyWords >= 40) { $("result").classList.add("hide"); msg.className = "msg info"; msg.textContent = "This doesn't look like English. The checker only knows English writing habits, so it can't score this text."; return; }
     if (r.tooShort) { $("result").classList.add("hide"); msg.textContent = `Only ${plural(r.wc, "word")}. There's too little to go on, so please paste at least 40 (150+ is better).`; return; }
     if (r.english < 20) { msg.className = "msg info"; msg.textContent = "This doesn't look like English. The checker only knows English writing habits, so this score means very little."; }
     $("result").classList.remove("hide");
@@ -577,7 +585,8 @@ if (typeof document !== "undefined") {
       const flagged = r.score >= cut;
       const isAI = label !== "Human" && label !== "Unlabelled";
       const det = label === "Unlabelled" ? null : (isAI ? flagged : !flagged);
-      const lean = r.attr.lean;
+      // the model guess is only shown (and only judged) when the text looks AI-like enough
+      const lean = r.score >= 45 || r.counts.hard ? r.attr.lean : "unclear";
       const mdl = (label === "Claude" || label === "ChatGPT") ? (lean === "unclear" ? "?" : (lean === label.toLowerCase())) : null;
       rows.push({ i: i + 1, label, wc: r.wc, score: r.score, band: r.band, lean, conf: r.attr.confidence, det, mdl, preview: text.replace(/\s+/g, " ").slice(0, 70) });
     });
