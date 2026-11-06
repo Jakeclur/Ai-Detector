@@ -54,6 +54,11 @@
   .scale span:nth-child(2) { text-align: center; } .scale span:nth-child(3) { text-align: right; }
   .suspect { margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: var(--soft); font-size: .95rem; }
   .suspect .note { display: block; margin-top: 2px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+  .facts div { background: var(--soft); border-radius: 8px; padding: 8px 10px; font-size: .85rem; color: var(--muted); }
+  .facts b { display: block; color: var(--ink); font-size: 1rem; }
+  .mnote { display: grid; grid-template-columns: 1fr 90px; gap: 2px 12px; padding: 7px 0; border-top: 1px solid var(--line); font-size: .9rem; }
+  .mnote:first-child { border-top: 0; }
   .pill { display: inline-block; font-size: .78rem; padding: 2px 9px; border-radius: 99px; background: var(--soft); color: var(--muted); margin-top: 6px; }
   h2 { font-size: 1.05rem; margin: 0 0 4px; }
   .h2note { color: var(--muted); font-size: .85rem; margin: 0 0 14px; }
@@ -109,7 +114,7 @@
   <h1>AI Text Detector</h1>
   <p class="sub">See how many known AI-writing habits a text shows, which chatbot it looks more like, and where the AI-like parts are. You can also compare it with someone's known writing, or test the detector on your own examples.</p>
 
-  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In tests on over 5,000 real human texts (including essays by people learning English) it wrongly flagged about 1 in 350, and it caught only about 1 in 3 real chatbot texts. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
+  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. On a held-out test of 2,339 real human texts (including essays by people learning English) it wrongly flagged 3 (about 1 in 800), and it caught about 4 in 5 of 6,413 chatbot texts. That drops to under 1 in 3 for recent Claude, and far lower for AI text a person has edited. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
 
   <div class="tabs">
     <button class="tab on" data-tab="check">Check a text</button>
@@ -147,13 +152,20 @@
           <div style="flex:1;min-width:220px">
             <div class="verdict" id="verdict"></div>
             <div class="note" id="verdictNote"></div>
-            <span class="pill" id="confPill"></span>
+            <span class="pill" id="confPill"></span> <span class="pill" id="evPill"></span>
             <div class="suspect" id="suspect"></div>
           </div>
           <button id="copy">Copy summary</button>
         </div>
         <div class="meter"><div class="marker" id="marker" style="left:0%"></div></div>
-        <div class="scale"><span>0–34 human-leaning</span><span>35–54 inconclusive</span><span>55–100 AI-leaning</span></div>
+        <div class="scale" id="scale"><span>likely human</span><span>inconclusive</span><span>likely AI</span></div>
+        <p class="note" style="margin:8px 0 0">The big number is an <b>AI likelihood estimate</b> out of 100 from the trained model: how much more this text resembles AI writing than human writing, assuming either was equally likely. It is not the share of the text written by AI, and it is not proof.</p>
+        <div class="facts" id="facts"></div>
+      </div>
+
+      <div class="card" id="whyCard">
+        <h2>How sure is this?</h2>
+        <div id="why"></div>
       </div>
 
       <div class="card caution hide" id="cautions"></div>
@@ -170,15 +182,21 @@
       </div>
 
       <div class="card hide" id="segCard">
-        <h2>Section by section</h2>
-        <p class="h2note">Each part scored on its own. One part scoring much higher than the rest can mean text was pasted in from somewhere else. Short sections give less reliable scores.</p>
+        <h2>Paragraph by paragraph</h2>
+        <p class="h2note">Each paragraph scored on its own by the trained model. One paragraph scoring much higher than the rest can mean text was pasted in from somewhere else. Short paragraphs give much less reliable scores, so don't read much into a single one.</p>
         <div class="strip" id="strip"></div>
         <div id="segs"></div>
       </div>
 
       <div class="card">
-        <h2>What affected the score</h2>
-        <p class="h2note">Bars to the right push the score up (more AI-like), bars to the left pull it down.</p>
+        <h2>What the trained model noticed</h2>
+        <p class="h2note">The features that moved the AI likelihood estimate most, compared with the average of the thousands of texts the model learned from. Each one alone is normal in human writing; only the combination matters.</p>
+        <div id="modelNotes"></div>
+      </div>
+
+      <div class="card">
+        <h2>Writing-habit clues (rule engine)</h2>
+        <p class="h2note">The detector's original hand-written clues, which are also inputs to the trained model. Bars to the right are AI-leaning habits, bars to the left human-leaning ones. <span id="rulesScoreNote"></span></p>
         <div id="signals"></div>
       </div>
 
@@ -245,7 +263,7 @@ a Claude answer goes here…</pre>
       <button class="primary" id="goLab">Run tests</button>
       <button data-upload="lab">Upload .txt</button>
       <button id="sampleLab">Load 20 sample passages</button>
-      <label class="note">AI cut-off: <input type="range" id="cut" min="35" max="80" step="1" value="55"> <b id="cutVal">55</b></label>
+      <label class="note">AI cut-off: <input type="range" id="cut" min="49" max="99" step="1" value="49"> <b id="cutVal">auto</b></label>
       <span class="count" id="countL"></span>
     </div>
     <div class="msg" id="msgL"></div>
@@ -263,6 +281,20 @@ a Claude answer goes here…</pre>
 
   <details>
     <summary>How accurate is it?</summary>
+    <p><b>v10 (current).</b> A trained model now combines the writing-habit clues with statistical, structural and semantic features. On held-out texts the model never saw (2,339 human, 6,413 AI):</p>
+    <div class="tablewrap"><table>
+      <tr><th>Kind of text</th><th class="n">v9</th><th class="n">v10</th></tr>
+      <tr><td>Real human texts wrongly flagged</td><td class="n">9 (0.38%)</td><td class="n">3 (0.13%)</td></tr>
+      <tr><td>… student and university essays (810)</td><td class="n">9</td><td class="n">1</td></tr>
+      <tr><td>… English-learner essays (875)</td><td class="n">0</td><td class="n">0</td></tr>
+      <tr><td>AI texts caught, overall</td><td class="n">53%</td><td class="n">82%</td></tr>
+      <tr><td>AI essays / stories / news</td><td class="n">56% / 22% / 5%</td><td class="n">85% / 62% / 49%</td></tr>
+      <tr><td>Claude (2023)</td><td class="n">13%</td><td class="n">56%</td></tr>
+      <tr><td>Claude Opus 5.5, held out (24 texts)</td><td class="n">13%</td><td class="n">29%</td></tr>
+      <tr><td>Paraphrased or reworded AI text</td><td class="n">16–40%</td><td class="n">50–71%</td></tr>
+      <tr><td>AI text run through a humaniser tool</td><td class="n">11%</td><td class="n">21%</td></tr>
+    </table></div>
+    <p>Ranking quality (ROC-AUC) rose from 0.907 to 0.993, and the likelihood estimate is now well calibrated (calibration error 0.152 → 0.012). Most AI test texts come from 2023 models, and no GPT-5/6, Gemini, DeepSeek or Llama samples were available, so accuracy on those is unknown. Full results: <code>docs/benchmark.html</code> in the project.</p>
     <p><b>v9 update.</b> Re-tested on a bigger set: 5,303 real human texts and 4,635 AI texts, including 300 AI news articles run through a "humaniser" tool. Humans wrongly flagged: 33 → 15 (0.3%), and fewer in every group (English learners 6 → 1). AI caught: 30% → 33%. On the half kept back from tuning, humans flagged went 13 → 8 and AI caught went 32% → 35%. Text run through a humaniser tool is still mostly missed (14% caught).</p>
     <p><b>Real-world test.</b> I tested it on 2,056 real human texts and 1,800 real chatbot texts from the <a href="https://github.com/vivek3141/ghostbuster-data">Ghostbuster dataset</a>: student essays, Reddit short stories, Reuters news articles and essays by people learning English, plus ChatGPT and Claude (2023 versions) writing on the same topics. Half of it was kept back and only used for the final check. Results at the 55 cut-off:</p>
     <div class="tablewrap"><table>
@@ -288,6 +320,7 @@ a Claude answer goes here…</pre>
   <details>
     <summary>What it looks for, and the research behind it</summary>
     <ul>
+      <li><b>Trained model (v10).</b> Logistic regression trained on about 10,000 real human and AI texts written for the same prompts, using everything below plus sentence-length patterns, paragraph shape, punctuation, pronouns, repeated sentence structures, word overlap between sentences, whether the ending repeats the opening, and how often about 300 common words appear. Seven versions of the model are trained on different samples; when they disagree, the confidence drops. A second model looks only for recent Claude writing. Cut-offs are set separately for essays, stories, news, explanations and emails, so formal essays are compared with other essays. Contractions, slang and slips are only ever allowed to make text look more human.</li>
       <li><b>Certain giveaways.</b> Lines a chatbot leaves behind when an answer is pasted unedited: "As an AI language model", "I hope this helps", "If you want, I can also…", "Would you like me to…", "[Your Name]", ChatGPT citation codes (<code>oaicite</code>, <code>utm_source=chatgpt.com</code>).</li>
       <li><b>Measured words only.</b> Words that studies counted as over-used against human writing: <i>delve</i>, <i>showcasing</i>, <i>underscores</i> (15 million science abstracts), and <i>dependable</i> (23× the human rate), <i>steady</i> and <i>thoughtful</i> for Claude Opus 5.5 (Graphite, 2026). Many words from blog lists were dropped: Originality.ai checked 10 million words of ChatGPT output and found favourites like "delve" were actually rare.</li>
       <li><b>Structure.</b> Sentence length and spread, bullet/heading/bold density, paragraph evenness, "In short"-style closers, "not X, it's Y" contrasts, rule-of-three lists, trailing ", highlighting…" clauses (2–5× more common in AI), hedging, vague attributions ("experts suggest"), generic praise words, colons, and a lack of concrete names and numbers. The absence-type clues count only a little.</li>
@@ -310,12 +343,17 @@ a Claude answer goes here…</pre>
 
 <script>
 /*CORE*/
+/*STATS*/
+/*ENSEMBLE*/
+const DETECTOR_MODEL = /*MODEL*/;
 
 if (typeof document !== "undefined") {
   const $ = id => document.getElementById(id);
   const escH = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const plural = (n, one, many) => n + " " + (n === 1 ? one : (many || one + "s"));
-  const toneOf = s => s < BANDS.human ? "human" : s < BANDS.ai ? "mixed" : "ai";
+  // colour for a likelihood: uses the trained model's general cut-offs (or the rule engine's bands without a model)
+  const CUT_H = DETECTOR_MODEL ? Math.round(DETECTOR_MODEL.cutoffs.human * 100) : BANDS.human, CUT_A = DETECTOR_MODEL ? Math.round(DETECTOR_MODEL.cutoffs.ai * 100) : BANDS.ai;
+  const toneOf = s => s < CUT_H ? "human" : s < CUT_A ? "mixed" : "ai";
 
   const H_JEROME = "There were four of us, George, and William Samuel Harris, and myself, and Montmorency. We were sitting in my room, smoking, and talking about how bad we were, bad from a medical point of view I mean, of course. We were all feeling seedy, and we were getting quite nervous about it. Harris said he felt such extraordinary fits of giddiness come over him at times, that he hardly knew what he was doing; and then George said that he had fits of giddiness too, and hardly knew what he was doing. With me, it was my liver that was out of order. I knew it was my liver that was out of order, because I had just been reading a patent liver-pill circular, in which were detailed the various symptoms by which a man could tell when his liver was out of order. I had them all.";
   const H_THOREAU = "When I wrote the following pages, or rather the bulk of them, I lived alone, in the woods, a mile from any neighbor, in a house which I had built myself, on the shore of Walden Pond, in Concord, Massachusetts, and earned my living by the labor of my hands only. I lived there two years and two months. At present I am a sojourner in civilized life again. I should not obtrude my affairs so much on the notice of my readers if very particular inquiries had not been made by my townsmen concerning my mode of life, which some would call impertinent, though they do not appear to me at all impertinent, but, considering the circumstances, very natural and pertinent. Some have asked what I got to eat; if I did not feel lonesome; if I was not afraid; and the like.";
@@ -375,27 +413,27 @@ if (typeof document !== "undefined") {
 
   // ---------- full analysis of one text ----------
   function fullAnalysis(raw) {
-    const cl = cleanText(raw);
-    const text = cl.text;
-    const r = analyze(text);
-    if (r.tooShort) return { tooShort: true, wc: r.wc };
-    r.text = text; r.cleanNotes = cl.notes;
+    const r = assess(raw);              // v10: rule engine + statistical features + trained model
+    if (r.tooShort) return r;
+    if (r.attr) return r;               // already analysed (cached)
+    const text = r.text;
     r.attr = attribute(text, r);
     r.segs = segments(text).filter(s => s.score != null);
+    r.paras = paragraphView(text);
     r.mix = mixedCheck(text, r);
     r.cautions = cautions(r);
     if (r.f.tooClean) r.cautions.push("This text sounds casual but is unusually tidy (no slips, even rhythm, neat ending). Some careful human writers write like this, so don't read much into that clue alone.");
-    if (r.mix.mixed) r.band = "mixed";
+    if (r.mix.mixed && r.band !== "ai") r.band = "mixed";
     r.english = englishCoverage(text);
     r.suspect = suspect(text, r, r.attr);
     return r;
   }
   const BAND_TEXT = {
-    human: ["Human-leaning", "human", "Few known AI habits. AI text written in a plain or casual style can still score this low, so this isn't proof a person wrote it."],
-    inconclusive: ["Inconclusive", "mixed", "Not enough evidence either way. Plenty of human writing and plenty of lightly edited AI writing land here."],
+    human: ["Likely human-written", "human", "The text looks like the human writing the detector was trained on. AI text that has been heavily edited, or written in a plain or casual style, can still land here, so this isn't proof a person wrote it."],
+    inconclusive: ["Inconclusive", "mixed", "Not enough evidence either way. Plenty of human writing and plenty of edited AI writing land here."],
     edited: ["Inconclusive: possibly edited AI", "mixed", "Few obvious AI habits, but casual touches sit on top of an AI-style explanation skeleton, which is what AI text looks like after someone edits it. People writing casually can look like this too. See the edited-AI check below."],
     mixed: ["Mixed: part of it stands out", "mixed", "Most of the text looks human-leaning, but one paragraph shows far more AI habits than the rest. It's shaded in the flagged text below. People's writing varies too, so this is a reason to look closer, not proof."],
-    ai: ["AI-leaning", "ai", "Many habits that chatbots overuse. That's a reason to look closer, not proof."]
+    ai: ["Likely AI-generated", "ai", "The text looks much more like the AI writing the detector was trained on than the human writing. That's a reason to look closer, not proof."]
   };
 
   // ---------- explanation rows ----------
@@ -405,39 +443,70 @@ if (typeof document !== "undefined") {
     const ex = type => [...new Set(r.hits.filter(h => h.type === type).map(h => '"' + r.text.slice(h.start, h.end).trim().replace(/\s+/g, " ").slice(0, 40) + '"'))].slice(0, 4).join(", ");
     const exLabel = re => [...new Set(r.hits.filter(h => h.type === "phrase" && re.test(h.label)).map(h => '"' + r.text.slice(h.start, h.end).trim().replace(/\s+/g, " ").slice(0, 40) + '"'))].slice(0, 3).join(", ");
     return [
-      { v: k.hard, t: "Certain giveaways", d: `${c.hard} found: ${ex("hard")}.` },
-      { v: k.vocab, t: "Words AI over-uses (measured)", d: `${c.vocab} found: ${ex("word")}.` },
-      { v: k.phrase, t: "Stock phrases", d: `${c.phrase} found: ${exLabel(/^(?!fiction|email|vague)/) || ex("phrase")}.` },
-      { v: k.fiction, t: "Fiction clichés", d: `${c.fiction} found: ${exLabel(/fiction/)}.` },
-      { v: k.hopeEnd, t: "Tidy hopeful ending", d: "The story ends on a neat, hopeful note, which recent AI stories lean towards." },
-      { v: k.email, t: "Email boilerplate", d: `${c.eopen} stock opener(s) and ${c.eclose} stock closer(s): ${exLabel(/email/)}.` },
-      { v: k.negpar, t: "\"Not X, it's Y\" contrasts", d: `${c.negpar} found. Counts less than before, because recent Claude versions use fewer negations.` },
-      { v: k.frame, t: "Chatbot-style framing", d: `${plural(c.frame, "sentence")} opening like "The key is…", "Here's…" or "In short".` },
-      { v: k.part, t: "Trailing -ing clauses", d: `${c.part} found (", highlighting…"). AI uses these 2–5× more than people.` },
-      { v: k.trans, t: "Formal transition openers", d: `${c.trans} of ${c.sentences} sentences start with words like "Moreover" or "Additionally".` },
-      { v: k.summ, t: "Summary closer", d: "Ends with a recap such as \"In short\" or \"Overall\". Opus 5.5 does this about 10× more than Opus 5." },
-      { v: k.vague, t: "Vague attributions", d: `${c.vague} found: ${exLabel(/vague/)}. Who exactly?` },
-      { v: k.hedge, t: "Hedging", d: `${plural(c.hedge, "hedge")} ("may", "often", "typically", "it depends").` },
-      { v: k.praise, t: "Generic praise words", d: `${c.praise} words like "amazing", "valuable", "meaningful".` },
-      { v: k.fmt, t: "Bullets, headings and bold", d: `${c.bullets} bullet lines, ${c.headings} headings, ${c.bolds} bold phrases${c.emoji ? `, ${c.emoji} emoji` : ""}.` },
-      { v: k.colon, t: "Colons", d: `${c.colons} colons introducing a point.` },
-      { v: k.tri, t: "Rule-of-three lists", d: `${plural(c.tri, "list")} like "A, B, and C".` },
+      { k: "hard", v: k.hard, t: "Certain giveaways", d: `${c.hard} found: ${ex("hard")}.` },
+      { k: "vocab", v: k.vocab, t: "Words AI over-uses (measured)", d: `${c.vocab} found: ${ex("word")}.` },
+      { k: "phrase", v: k.phrase, t: "Stock phrases", d: `${c.phrase} found: ${exLabel(/^(?!fiction|email|vague)/) || ex("phrase")}.` },
+      { k: "fiction", v: k.fiction, t: "Fiction clichés", d: `${c.fiction} found: ${exLabel(/fiction/)}.` },
+      { k: "hopeEnd", v: k.hopeEnd, t: "Tidy hopeful ending", d: "The story ends on a neat, hopeful note, which recent AI stories lean towards." },
+      { k: "email", v: k.email, t: "Email boilerplate", d: `${c.eopen} stock opener(s) and ${c.eclose} stock closer(s): ${exLabel(/email/)}.` },
+      { k: "negpar", v: k.negpar, t: "\"Not X, it's Y\" contrasts", d: `${c.negpar} found. Counts less than before, because recent Claude versions use fewer negations.` },
+      { k: "frame", v: k.frame, t: "Chatbot-style framing", d: `${plural(c.frame, "sentence")} opening like "The key is…", "Here's…" or "In short".` },
+      { k: "part", v: k.part, t: "Trailing -ing clauses", d: `${c.part} found (", highlighting…"). AI uses these 2–5× more than people.` },
+      { k: "trans", v: k.trans, t: "Formal transition openers", d: `${c.trans} of ${c.sentences} sentences start with words like "Moreover" or "Additionally".` },
+      { k: "summ", v: k.summ, t: "Summary closer", d: "Ends with a recap such as \"In short\" or \"Overall\". Opus 5.5 does this about 10× more than Opus 5." },
+      { k: "vague", v: k.vague, t: "Vague attributions", d: `${c.vague} found: ${exLabel(/vague/)}. Who exactly?` },
+      { k: "hedge", v: k.hedge, t: "Hedging", d: `${plural(c.hedge, "hedge")} ("may", "often", "typically", "it depends").` },
+      { k: "praise", v: k.praise, t: "Generic praise words", d: `${c.praise} words like "amazing", "valuable", "meaningful".` },
+      { k: "fmt", v: k.fmt, t: "Bullets, headings and bold", d: `${c.bullets} bullet lines, ${c.headings} headings, ${c.bolds} bold phrases${c.emoji ? `, ${c.emoji} emoji` : ""}.` },
+      { k: "colon", v: k.colon, t: "Colons", d: `${c.colons} colons introducing a point.` },
+      { k: "tri", v: k.tri, t: "Rule-of-three lists", d: `${plural(c.tri, "list")} like "A, B, and C".` },
       { v: k.dash, t: "Em dashes (weak, version-dependent)", d: `${plural(c.dashes, "em dash", "em dashes")}. Some models use many, others (like Claude Opus 5.5) almost none.` },
-      { v: k.lowSpec, t: "Few concrete specifics", d: `Few names, numbers or quotes (${c.specifics.toFixed(1)} per 100 words). Generic writing is a mild AI sign.` },
-      { v: k.even, t: "Overly even tone", d: `Sentence lengths${c.paras >= 3 ? " and paragraph lengths" : ""} are very uniform, with no exclamations or questions.` },
-      { v: k.shape, t: "Opus 5.5 answer shape", d: `${c.shapeN} of 5 habits found in real Claude Opus 5.5 answers: ${[c.shapeLabel && "label-style paragraphs (\"Storage. Solar produces…\")", c.shapeList && "a colon line then a plain list", c.shapeOpener && "a one-sentence opening answer", c.shapeWhy && "\"that's why\"", c.shapeFrame && "\"the good news is\" / \"depends on\""].filter(Boolean).join(", ")}. One alone is normal in human writing; three or more never appeared in 2,281 human texts.` },
+      { k: "lowSpec", v: k.lowSpec, t: "Few concrete specifics", d: `Few names, numbers or quotes (${c.specifics.toFixed(1)} per 100 words). Generic writing is a mild AI sign.` },
+      { k: "even", v: k.even, t: "Overly even tone", d: `Sentence lengths${c.paras >= 3 ? " and paragraph lengths" : ""} are very uniform, with no exclamations or questions.` },
+      { k: "shape", v: k.shape, t: "Opus 5.5 answer shape", d: `${c.shapeN} of 5 habits found in real Claude Opus 5.5 answers: ${[c.shapeLabel && "label-style paragraphs (\"Storage. Solar produces…\")", c.shapeList && "a colon line then a plain list", c.shapeOpener && "a one-sentence opening answer", c.shapeWhy && "\"that's why\"", c.shapeFrame && "\"the good news is\" / \"depends on\""].filter(Boolean).join(", ")}. One alone is normal in human writing; three or more never appeared in 2,281 human texts.` },
       { v: r.band === "edited" && r.rawScore < r.score ? 0.8 : 0, t: "Edited-AI check", d: `Casual touches on top of an AI-style skeleton raised the score from ${r.rawScore} to ${r.score} (the inconclusive range). This check can never make a result AI-leaning.` },
-      { v: k.tooClean, t: "Casual but too clean", d: "Sounds casual, yet has no slips at all, even rhythm and a neat moral or generic ending." },
-      { v: k.wrap, t: "Neat moral ending", d: "The last sentence wraps things up in a stock way." },
+      { k: "tooClean", v: k.tooClean, t: "Casual but too clean", d: "Sounds casual, yet has no slips at all, even rhythm and a neat moral or generic ending." },
+      { k: "wrap", v: k.wrap, t: "Neat moral ending", d: "The last sentence wraps things up in a stock way." },
       { v: rhythm, t: "Sentence rhythm", d: `${c.sentences} sentences, ${c.minLen}–${c.maxLen} words (average ${c.avgLen.toFixed(0)}, spread ${c.cv.toFixed(2)}). ${rhythm < -0.15 ? "Lengths vary a lot, which is more typical of people." : "Fairly even lengths."}` },
-      { v: k.cite, t: "In-text citations", d: `${c.citeN} citation(s) like "(Smith, 2020)". 65% of real student essays have these, but only 1–2% of chatbot essays.` },
-      { v: k.slips, t: "Human slips and casual markers", d: `${c.slips} found (missing apostrophes, lowercase "i", slang, "!!").` }
+      { k: "cite", v: k.cite, t: "In-text citations", d: `${c.citeN} citation(s) like "(Smith, 2020)". 65% of real student essays have these, but only 1–2% of chatbot essays.` },
+      { k: "slips", v: k.slips, t: "Human slips and casual markers", d: `${c.slips} found (missing apostrophes, lowercase "i", slang, "!!").` }
     ];
+  }
+
+  // plain-English names for the trained model's features
+  const FEATURE_NAMES = {
+    sl_mean: "average sentence length", sl_sd: "spread of sentence lengths", sl_cv: "variation in sentence length", sl_skew: "a few very long sentences among short ones",
+    sl_ac1: "long and short sentences clumping together", sl_short: "share of short sentences", sl_long: "share of long sentences", para_n: "number of paragraphs",
+    para_cv: "variation in paragraph length", para_sents: "sentences per paragraph", p_comma: "commas", p_semi: "semicolons", p_colon: "colons", p_dash: "dashes",
+    p_paren: "brackets", p_quote: "quotation marks", p_q: "question marks", p_excl: "exclamation marks", p_hyph: "hyphenated words", pr_i: "I / me / my",
+    pr_we: "we / us / our", pr_you: "you / your", pr_3: "he / she / they", digits: "numbers", caps: "names and capitalised words",
+    tmpl_rep: "sentences that start the same way", parallel: "back-to-back sentences built the same way", open_rep: "paragraphs that open the same way",
+    discourse: "sentences opening with linking words (however, also, for example)", ov_mean: "word overlap between neighbouring sentences",
+    ov_sd: "variation in that overlap", intro_concl: "the ending repeating the opening", tri_rep: "repeated three-word phrases"
+  };
+  const PUNCT = { ",": "commas", ".": "full stops", ";": "semicolons", ":": "colons", "!": "exclamation marks", "?": "question marks", "(": "brackets", ")": "closing brackets", '"': "quotation marks", "—": "em dashes", "–": "en dashes" };
+  function modelNotes(r) {
+    if (!r.model) return `<p class="none">The trained model isn't available, so only the rule engine was used.</p>`;
+    const ruleTitle = Object.fromEntries(describe(r).map(d => [d.k, d.t]));
+    const nice = name => {
+      const [kind, key] = [name.slice(0, name.indexOf(":")), name.slice(name.indexOf(":") + 1)];
+      if (kind === "style") return FEATURE_NAMES[key] || key;
+      if (kind === "tok") return PUNCT[key] ? PUNCT[key] : `the word "${key}"`;
+      return (ruleTitle[key] || key) + " (rule clue)";
+    };
+    const rows = r.model.top.filter(t => Math.abs(t[1]) > 0.12).slice(0, 9);
+    if (!rows.length) return `<p class="none">No single feature stood out; the estimate comes from many small differences.</p>`;
+    const max = Math.max(...rows.map(t => Math.abs(t[1])));
+    return rows.map(([name, c, z]) => {
+      const w = Math.min(50, Math.abs(c) / max * 50);
+      const style = c > 0 ? `left:50%;width:${w}%;background:var(--ai)` : `right:50%;width:${w}%;background:var(--human)`;
+      return `<div class="mnote"><div><b>${escH(nice(name))}</b>: ${z > 0 ? "more" : "less"} than typical<div class="note">${c > 0 ? "Pushes towards AI" : "Pushes towards human"}.</div></div><div class="push"><i style="${style}"></i></div></div>`;
+    }).join("") + `<div class="push-lbl"><span>human</span><span>AI</span></div>`;
   }
 
   function renderAttr(r) {
     const a = r.attr;
-    if (r.score < 45 && !r.counts.hard) {
+    if (r.band === "human" && !r.counts.hard && !r.specialist) {
       $("attr").innerHTML = `<p class="none" style="margin:4px 0 0">Not enough AI-like signs to compare chatbot styles. (Model clues found anyway: Claude ${a.claude.toFixed(1)}, ChatGPT ${a.gpt.toFixed(1)}.)</p>`;
       return;
     }
@@ -498,12 +567,39 @@ if (typeof document !== "undefined") {
     if (parts.length) $("cleanNote").innerHTML = `<b>The text was cleaned before checking:</b> ${escH(parts.join("; "))}.${n.homoglyphs ? " Look-alike letters are sometimes used on purpose to fool detectors." : ""}${n.hidden ? " Invisible characters can come from copying text out of some AI tools, websites or word processors." : ""}`;
 
     const B = BAND_TEXT[r.band];
-    $("scoreNum").textContent = r.score;
+    $("scoreNum").textContent = r.likelihood;
     $("scoreNum").style.color = `var(--${B[1]})`;
     $("verdict").textContent = B[0];
     $("verdictNote").textContent = r.counts.hard ? "Contains text a chatbot typically leaves behind when its answer is pasted in. See the red box above." : B[2];
-    $("confPill").textContent = r.wc < 120 ? "Low confidence: short text" : r.wc < 250 ? "Medium confidence" : "Higher confidence: long enough text";
-    $("marker").style.left = r.score + "%";
+    $("confPill").textContent = `Confidence: ${r.confidence}`;
+    $("evPill").textContent = `Evidence: ${r.evidence}`;
+    $("marker").style.left = r.likelihood + "%";
+    // meter coloured by this text's own cut-offs (they depend on the type of writing)
+    const ch = r.cutHuman, ca = r.cutAI;
+    document.querySelector(".meter").style.background = `linear-gradient(90deg, var(--human) 0%, var(--human) ${ch}%, var(--mixed) ${ch + 1}%, var(--mixed) ${ca - 1}%, var(--ai) ${ca}%, var(--ai) 100%)`;
+    $("scale").style.display = "flex"; $("scale").style.justifyContent = "space-between";
+    $("scale").innerHTML = `<span>0–${ch} likely human</span><span>inconclusive</span><span>${ca}–100 likely AI</span>`;
+    const GENRE = { academic: "essay / academic", creative: "story / creative", news: "news report", explanation: "explanation / how-to", conversational: "email or message", other: "general" };
+    $("facts").innerHTML = [
+      ["Text length", plural(r.wc, "word")],
+      ["Paragraphs analysed", String(r.paras.length || 1)],
+      ["Type of writing", GENRE[r.genre] || "general"],
+      ["Trained model", r.model ? `${Math.round(r.model.p * 100)} / 100` : "not available"],
+      ["Rule-engine habit score", `${r.rulesScore} / 100`],
+      ["Recent-Claude check", r.model && r.model.spec.length ? (r.specialist ? "matched" : "no match") : "not available"]
+    ].map(([k, v]) => `<div>${escH(k)}<b>${escH(v)}</b></div>`).join("");
+    // how sure: uncertainty, agreement, out-of-distribution
+    const whyItems = [];
+    whyItems.push(`<b>Confidence: ${r.confidence}.</b> ${r.confidence === "medium" ? "The text is long enough, the different signals agree, and it looks like the kind of writing the model was trained on." : "Treat this result as a weak hint."} Confidence is never "high": no detector can prove who wrote something.`);
+    whyItems.push(`<b>Evidence: ${r.evidence}.</b> ${r.evidence === "limited" ? "There isn't much text to go on." : r.evidence === "good" ? "Plenty of text, and at least two independent groups of signals point the same way." : "A reasonable amount of text, but the signals don't all line up strongly."}`);
+    if (r.model) whyItems.push(`<b>Signals:</b> the rule engine's habit score is ${r.rulesScore}, the trained model says ${Math.round(r.model.p * 100)}${r.model.spec.length ? `, and the recent-Claude check ${r.specialist ? "matched" : "didn't match"}` : ""}. ${r.agree ? "They broadly agree." : "They disagree, which lowers confidence."}`);
+    else whyItems.push("<b>The trained model isn't available</b>, so this result uses only the rule engine (less accurate).");
+    if (r.model && r.model.pHigh - r.model.pLow <= 0.35) whyItems.push(`<b>Likely range:</b> the model's members put this text between about ${Math.round(r.model.pLow * 100)} and ${Math.round(r.model.pHigh * 100)}.`);
+    r.uncertainty.forEach(u => whyItems.push(escH(u)));
+    if (r.obs) whyItems.push(`<span class="note">For information only (not scored, because they unfairly penalise people writing in a second language): vocabulary variety ${(r.obs.mattr * 100).toFixed(0)} different words per 100, average word length ${r.obs.wordLen.toFixed(1)} letters.</span>`);
+    $("why").innerHTML = `<ul class="diffs">${whyItems.map(x => `<li>${x}</li>`).join("")}</ul>`;
+    $("modelNotes").innerHTML = modelNotes(r);
+    $("rulesScoreNote").textContent = `Habit score for this text: ${r.rulesScore}.`;
     const sp = r.suspect;
     $("suspect").innerHTML = `Suspected AI: <b>${escH(sp.label)}</b>${sp.confidence !== "none" ? ` <span class="pill" style="margin-top:0">${sp.confidence} confidence</span>` : ""}<span class="note">${escH(sp.detail)} This is a hint, not proof.</span>`;
 
@@ -535,12 +631,14 @@ if (typeof document !== "undefined") {
       return `<div class="sig"><b>${escH(s.t)}</b><div class="push"><i style="${style}"></i></div><div class="d">${escH(s.d)}</div></div>`;
     }).join("") + `<div class="push-lbl"><span>human</span><span>AI</span></div>` : `<p class="none">No signals either way.</p>`;
 
-    const segs = r.segs;
+    const segs = r.paras && r.paras.length >= 2 ? r.paras.map(p => ({ start: p.start, end: p.end, score: p.likelihood, words: p.words })) : r.segs;
+    // paragraphs under 100 words are too short to score reliably: shown in grey
+    const segTone = s => s.words != null && s.words < 100 ? "muted" : toneOf(s.score);
     $("segCard").classList.toggle("hide", segs.length < 2);
     if (segs.length >= 2) {
       const total = segs.reduce((a, s) => a + (s.end - s.start), 0);
-      $("strip").innerHTML = segs.map((s, i) => `<div title="Section ${i + 1}: ${s.score}" style="flex:${(s.end - s.start) / total};background:var(--${toneOf(s.score)})">${s.score}</div>`).join("");
-      $("segs").innerHTML = segs.map((s, i) => `<div class="seg"><div class="badge" style="background:var(--${toneOf(s.score)})">${s.score}</div><div><b>Section ${i + 1}</b> · ${plural(nWords(r.text.slice(s.start, s.end)), "word")}<div class="note">${escH(r.text.slice(s.start, s.end).trim().slice(0, 140))}…</div></div></div>`).join("");
+      $("strip").innerHTML = segs.map((s, i) => `<div title="Paragraph ${i + 1}: ${s.score}" style="flex:${(s.end - s.start) / total};background:var(--${segTone(s)})">${s.score}</div>`).join("");
+      $("segs").innerHTML = segs.map((s, i) => `<div class="seg"><div class="badge" style="background:var(--${segTone(s)})">${s.score}</div><div><b>Paragraph ${i + 1}</b> · ${plural(nWords(r.text.slice(s.start, s.end)), "word")}${s.words != null && s.words < 100 ? " · short, unreliable" : ""}<div class="note">${escH(r.text.slice(s.start, s.end).trim().slice(0, 140))}…</div></div></div>`).join("");
       const hi = Math.max(...segs.map(s => s.score)), lo = Math.min(...segs.map(s => s.score));
       if (r.mix.mixed) $("segs").insertAdjacentHTML("afterbegin", `<p style="margin:0 0 8px;font-size:.92rem"><b>One paragraph stands out:</b> it scores ${r.mix.para.score}, while the other paragraphs score around ${r.mix.para.median}. That's worth a closer look.</p>`);
     }
@@ -548,13 +646,15 @@ if (typeof document !== "undefined") {
     renderMarked(r);
 
     lastSummary = [
-      `AI Text Detector result: ${r.score}/100, ${B[0]} (${r.wc} words, ${$("confPill").textContent.toLowerCase()}).`,
+      `AI Text Detector result: ${B[0]}. AI likelihood estimate ${r.likelihood}/100 (not proof, not a percentage of AI text). Confidence ${r.confidence}, evidence ${r.evidence}, ${r.wc} words, type of writing: ${r.genre || "general"}.`,
+      r.model ? `Signals: trained model ${Math.round(r.model.p * 100)}, rule-engine habit score ${r.rulesScore}${r.specialist ? ", recent-Claude check matched" : ""}.` : `Rule engine only (trained model unavailable): ${r.rulesScore}.`,
+      ...r.uncertainty.map(u => "Uncertainty: " + u),
       `Suspected AI: ${r.suspect.label}${r.suspect.confidence !== "none" ? ` (${r.suspect.confidence} confidence)` : ""}.`,
       ...rows.filter(s => s.v > 0.1).slice(0, 6).map(s => `+ ${s.t}: ${s.d}`),
       ...rows.filter(s => s.v < -0.1).slice(0, 3).map(s => `- ${s.t}: ${s.d}`),
-      segs.length >= 2 ? `Sections: ${segs.map(s => s.score).join(", ")}` : "",
+      segs.length >= 2 ? `Paragraphs: ${segs.map(s => s.score).join(", ")}` : "",
       ...r.cautions.map(c => "Caution: " + c),
-      "Note: this checks for writing habits chatbots overuse. It is not proof of who wrote the text."
+      "Note: this is a statistical estimate from writing patterns. It is not proof of who wrote the text."
     ].filter(Boolean).join("\n");
     $("copy").textContent = "Copy summary";
     $("result").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -595,14 +695,15 @@ if (typeof document !== "undefined") {
   };
 
   // ---------- test lab ----------
-  $("cut").oninput = () => { $("cutVal").textContent = $("cut").value; if (!$("lresult").classList.contains("hide")) runLab(); };
+  // far left = "auto": use the detector's own cut-offs (they depend on the type of writing)
+  $("cut").oninput = () => { $("cutVal").textContent = +$("cut").value === 49 ? "auto" : $("cut").value; if (!$("lresult").classList.contains("hide")) runLab(); };
   const LABEL_RE = /^\s*\[?\s*(human|claude|chatgpt|gpt|openai|ai|other)\s*\]?\s*:?\s*$/i;
   let labCsv = "";
   function runLab() {
     const msg = $("msgL"); msg.className = "msg"; msg.textContent = "";
     const raw = $("lab").value.replace(/\r\n?/g, "\n").trim();
     if (!raw) { msg.textContent = "Paste some texts first, or load the sample passages."; return; }
-    const cut = +$("cut").value;
+    const cutRaw = +$("cut").value, cut = cutRaw === 49 ? "auto" : cutRaw;
     const blocks = raw.split(/\n\s*-{3,}\s*\n/).map(b => b.trim()).filter(Boolean);
     const rows = [];
     blocks.forEach((b, i) => {
@@ -613,13 +714,14 @@ if (typeof document !== "undefined") {
       const text = lines.join("\n").trim();
       const r = fullAnalysis(text);
       if (r.tooShort) { rows.push({ i: i + 1, label, wc: r.wc, short: true, preview: text.slice(0, 60) }); return; }
-      const flagged = r.score >= cut;
+      const flagged = cut === "auto" ? r.band === "ai" : r.flag;
       const isAI = label !== "Human" && label !== "Unlabelled";
       const det = label === "Unlabelled" ? null : (isAI ? flagged : !flagged);
       // the model guess is only shown (and only judged) when the text looks AI-like enough
-      const lean = r.score >= 45 || r.counts.hard ? r.attr.lean : "unclear";
+      let lean = r.band !== "human" || r.counts.hard ? r.attr.lean : "unclear";
+      if (lean === "unclear" && r.specialist) lean = "claude";   // the trained recent-Claude check matched
       const mdl = (label === "Claude" || label === "ChatGPT") ? (lean === "unclear" ? "?" : (lean === label.toLowerCase())) : null;
-      rows.push({ i: i + 1, label, wc: r.wc, score: r.score, band: r.band, lean, conf: r.attr.confidence, sus: r.suspect.short, det, mdl, preview: text.replace(/\s+/g, " ").slice(0, 70) });
+      rows.push({ i: i + 1, label, wc: r.wc, score: r.score, band: r.band, flag: flagged, lean, conf: r.attr.confidence, sus: r.suspect.short, det, mdl, preview: text.replace(/\s+/g, " ").slice(0, 70) });
     });
     const ok = rows.filter(r => !r.short);
     const by = l => ok.filter(r => r.label === l);
@@ -627,18 +729,18 @@ if (typeof document !== "undefined") {
     const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "–";
     const mean = a => a.length ? Math.round(a.reduce((s, r) => s + r.score, 0) / a.length) : "–";
     const mdlRows = ok.filter(r => r.mdl !== null);
-    $("lsummary").innerHTML = `<h2>Summary at cut-off ${cut}</h2>
+    $("lsummary").innerHTML = `<h2>Summary (${cut === "auto" ? "the detector's own cut-offs" : "cut-off " + cut})</h2>
       <table><tr><th>Group</th><th class="n">Texts</th><th class="n">Average score</th><th class="n">Flagged as AI</th></tr>
-      ${["Human", "Claude", "ChatGPT", "AI", "Unlabelled"].map(l => by(l)).map((g, j) => g.length ? `<tr><td>${["Human", "Claude", "ChatGPT", "Other AI", "Unlabelled"][j]}</td><td class="n">${g.length}</td><td class="n">${mean(g)}</td><td class="n">${pct(g.filter(r => r.score >= cut).length, g.length)}</td></tr>` : "").join("")}
+      ${["Human", "Claude", "ChatGPT", "AI", "Unlabelled"].map(l => by(l)).map((g, j) => g.length ? `<tr><td>${["Human", "Claude", "ChatGPT", "Other AI", "Unlabelled"][j]}</td><td class="n">${g.length}</td><td class="n">${mean(g)}</td><td class="n">${pct(g.filter(r => r.flag).length, g.length)}</td></tr>` : "").join("")}
       </table>
-      <p style="margin:6px 0 0;font-size:.93rem"><b>Human texts wrongly flagged:</b> ${hum.length ? `${hum.filter(r => r.score >= cut).length} of ${hum.length}` : "no human texts labelled"} · <b>AI texts caught:</b> ${ais.length ? `${ais.filter(r => r.score >= cut).length} of ${ais.length}` : "no AI texts labelled"} · <b>Model guessed right:</b> ${mdlRows.length ? `${mdlRows.filter(r => r.mdl === true).length} of ${mdlRows.length} (wrong ${mdlRows.filter(r => r.mdl === false).length}, can't tell ${mdlRows.filter(r => r.mdl === "?").length})` : "no Claude/ChatGPT labels"}</p>
+      <p style="margin:6px 0 0;font-size:.93rem"><b>Human texts wrongly flagged:</b> ${hum.length ? `${hum.filter(r => r.flag).length} of ${hum.length}` : "no human texts labelled"} · <b>AI texts caught:</b> ${ais.length ? `${ais.filter(r => r.flag).length} of ${ais.length}` : "no AI texts labelled"} · <b>Model guessed right:</b> ${mdlRows.length ? `${mdlRows.filter(r => r.mdl === true).length} of ${mdlRows.length} (wrong ${mdlRows.filter(r => r.mdl === false).length}, can't tell ${mdlRows.filter(r => r.mdl === "?").length})` : "no Claude/ChatGPT labels"}</p>
       ${rows.some(r => r.short) ? `<p class="note">${rows.filter(r => r.short).length} text(s) were under 40 words and skipped.</p>` : ""}
-      <p class="note" style="margin-bottom:0">Tip: drag the cut-off to see the trade-off. Lower catches more AI but flags more humans. Paste these results back to Claude to help tune the weights.</p>`;
+      <p class="note" style="margin-bottom:0">Tip: "auto" uses the detector's own cut-offs, which depend on the type of writing. Drag the slider to try a fixed cut-off instead: lower catches more AI but flags more humans. Paste these results back to Claude to help tune the weights.</p>`;
     const mark = v => v === null ? "" : v === "?" ? `<span class="note">can't tell</span>` : v ? `<span class="ok">✓</span>` : `<span class="bad">✗</span>`;
-    const leanTxt = r => r.score >= 45 && r.sus && r.sus !== "none" ? r.sus : r.lean === "claude" ? "Claude" : r.lean === "chatgpt" ? "ChatGPT" : "can't tell";
-    $("ltable").innerHTML = `<tr><th>#</th><th>Label</th><th class="n">Words</th><th class="n">Score</th><th>Result</th><th>Detected?</th><th>Suspected AI</th><th>Model?</th><th>Start of text</th></tr>` +
+    const leanTxt = r => r.band !== "human" && r.sus && r.sus !== "none" ? r.sus : r.lean === "claude" ? "Claude" : r.lean === "chatgpt" ? "ChatGPT" : "can't tell";
+    $("ltable").innerHTML = `<tr><th>#</th><th>Label</th><th class="n">Words</th><th class="n">AI likelihood</th><th>Result</th><th>Detected?</th><th>Suspected AI</th><th>Model?</th><th>Start of text</th></tr>` +
       rows.map(r => r.short ? `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td colspan="5" class="note">too short</td><td class="note">${escH(r.preview)}</td></tr>` :
-        `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td class="n" style="color:var(--${toneOf(r.score)});font-weight:700">${r.score}</td><td>${BAND_TEXT[r.band][0].split(":")[0]}</td><td>${mark(r.det)}</td><td>${r.score >= 45 ? leanTxt(r) + (r.conf !== "none" ? ` <span class="note">(${r.conf})</span>` : "") : `<span class="note">–</span>`}</td><td>${mark(r.mdl)}</td><td class="note">${escH(r.preview)}…</td></tr>`).join("");
+        `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td class="n" style="color:var(--${toneOf(r.score)});font-weight:700">${r.score}</td><td>${BAND_TEXT[r.band][0].split(":")[0]}</td><td>${mark(r.det)}</td><td>${r.band !== "human" ? leanTxt(r) + (r.conf !== "none" ? ` <span class="note">(${r.conf})</span>` : "") : `<span class="note">–</span>`}</td><td>${mark(r.mdl)}</td><td class="note">${escH(r.preview)}…</td></tr>`).join("");
     labCsv = ["#\tlabel\twords\tscore\tresult\tdetected\tlooks_like\tmodel_correct\tstart"].concat(rows.map(r => r.short ? `${r.i}\t${r.label}\t${r.wc}\t\ttoo short\t\t\t\t${r.preview}` : `${r.i}\t${r.label}\t${r.wc}\t${r.score}\t${r.band}\t${r.det === null ? "" : r.det ? "yes" : "no"}\t${leanTxt(r)}\t${r.mdl === null ? "" : r.mdl === "?" ? "unclear" : r.mdl ? "yes" : "no"}\t${r.preview}`)).join("\n") + `\ncut-off\t${cut}`;
     $("countL").textContent = plural(blocks.length, "text");
     $("lresult").classList.remove("hide");

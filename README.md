@@ -1,8 +1,9 @@
 # AI Text Detector
 
-A rules-based AI-writing detector that runs entirely in your web browser. Paste some writing (or upload a `.txt` or `.docx` file) and it shows:
+An AI-writing detector that runs entirely in your web browser. Since v10 it combines hand-written writing-habit clues with a small statistical classifier trained and tested on about 20,000 real human and AI texts. Paste some writing (or upload a `.txt` or `.docx` file) and it shows:
 
-- a 0–100 score for how many known AI-writing habits the text has, with a **Human-leaning / Inconclusive / Mixed / AI-leaning** result
+- an **AI likelihood estimate** (0–100, calibrated), a **Likely human-written / Inconclusive / Mixed / Likely AI-generated** result, a **confidence** level (low or medium, never high) and an **evidence quality** rating, with the reasons for any uncertainty
+- **what the trained model noticed**, in plain English, and a **paragraph-by-paragraph** view
 - a **Suspected AI** line at the end of every result: "No AI suspected", a model and version guess (e.g. *Claude Opus 5.5*, *older Claude*, *ChatGPT (GPT-5/6)*), or "can't tell"
 - **which chatbot it looks more like**, Claude or ChatGPT, with an honest confidence level
 - a **bar for every clue**, showing what pushed the score up or down
@@ -11,7 +12,7 @@ A rules-based AI-writing detector that runs entirely in your web browser. Paste 
 
 It also has a **Compare** tab, which checks whether a text matches someone's known writing style, and a **Test lab** tab for testing the detector on your own labelled examples.
 
-There is no AI model inside, and nothing you paste is sent anywhere.
+There is no large AI model inside (the classifier is a set of weights small enough to ship in the page, about 70 KB), and nothing you paste is sent anywhere.
 
 > **Important:** no detector can prove who wrote something. A high score means "look closer", never proof. A low score doesn't mean a person wrote it. Don't use this to accuse anyone.
 
@@ -90,7 +91,7 @@ a Claude answer goes here…
 Labels can be `Human`, `Claude`, `ChatGPT` (or `GPT`/`OpenAI`), or `AI` for any other model. Press **Run tests** to get:
 - a summary per group: average score, % flagged, humans wrongly flagged, AI caught, and how often the model guess was right
 - a table with each text's score, result, ✓/✗ for detection and ✓/✗ for the model guess
-- an **AI cut-off slider** (35–80), to see the trade-off between catching AI and wrongly flagging people
+- an **AI cut-off slider**: "auto" (far left) uses the detector's own genre-aware cut-offs; 50–99 tries a fixed likelihood cut-off, to see the trade-off between catching AI and wrongly flagging people
 - **Copy results** (tab-separated), to paste back to Claude for tuning
 - **Load 20 sample passages**, the built-in test set
 
@@ -98,14 +99,32 @@ Labels can be `Human`, `Claude`, `ChatGPT` (or `GPT`/`OpenAI`), or `AI` for any 
 
 ## How it works
 
-1. **Clean** the text (see above).
-2. **Measure about 25 clues** (listed below). Each one is a rate, such as "per 100 words" or "per sentence", or a yes/no.
-3. **Combine** them with a logistic model: `z = bias + Σ weight × min(clue, cap)`, then `p = 1 / (1 + e^-z)`. Caps stop any single clue from dominating.
-4. **Shrink short texts** towards 50%: `score = 50 + (p − 50) × (0.5 + 0.5 × confidence)`, where confidence rises from 0 at 40 words to 1 at 300 words.
-5. **Band** the score. Any certain giveaway with a score of 45+ forces "AI-leaning". One paragraph standing far above the others forces "Mixed".
-6. **Attribute** separately, using Claude and ChatGPT fingerprint clues (see below).
+Since v10, three independent views of the text are combined:
 
-The weights were set by hand from the research, then checked against a labelled test set. Clues based on something being *absent* (few names and numbers, even rhythm) have small weights, so they can never push a text high on their own.
+1. **Clean** the text (hidden characters, look-alike letters, odd spaces, curly quotes).
+2. **Rule engine** (`src/core.js`): about 27 hand-written writing-habit clues (listed below). It gives the clue bars and highlights, and its clue values also feed the model.
+3. **Statistical features** (`src/stats.js`):
+   - sentence-length distribution (mean, spread, skew, short/long shares, whether long and short sentences clump)
+   - paragraph shape
+   - punctuation and pronoun profiles
+   - structural repetition (sentences or paragraphs that start the same way, linking-word openers)
+   - semantic redundancy (word overlap between neighbouring sentences, the ending repeating the opening, repeated phrases)
+   - a profile of the ~300 most common words and punctuation marks
+4. **Trained classifier** (`src/model.json`, made by `tests/train.js`):
+   - logistic regression over all of the above, trained on about 10,000 labelled texts
+   - a bootstrap ensemble of 7 members; how much they disagree is shown as the likely range
+   - calibrated so the number is a fair likelihood estimate (calibration error 0.012 vs 0.152 for v9)
+   - fairness rules built in: contractions, slang and slips can only push towards human; the AI-habit clues can't flip direction; human texts count twice in the training loss; vocabulary richness and word length are never scored
+5. **Recent-Claude check:** a second, smaller model trained only on Claude Opus 5.5 writing vs human writing, with its own stricter cut-off. The general model is dominated by 2023 writing.
+6. **Genre-aware cut-offs:** the "likely AI" and "likely human" lines are set from what real human texts *of the same type* score (essays, stories, news, explanations, emails), so formal essays are compared with other essays.
+7. **Confidence, evidence and out-of-distribution checks:**
+   - Short texts are pulled towards the middle.
+   - Long documents are scored in ~600-word chunks and combined.
+   - Unusual layouts (poems, lists of short lines) or text unlike anything in training get their estimate pulled towards 50 and can't be called "likely AI" without overwhelming evidence.
+   - Confidence is only "medium" when the text is long enough, the rule engine and model agree, and the ensemble members agree. Otherwise it's "low", and it's never "high".
+8. **Extras kept from earlier versions:** certain giveaways (leftover chatbot text), the edited-AI check, the Mixed paragraph check, Claude-vs-ChatGPT attribution with a version guess, and fairness cautions.
+
+If the model file is missing or fails, the page falls back to the v9 rule engine and says so.
 
 ---
 
@@ -179,6 +198,48 @@ Each family has its own fingerprint clues. The detector adds them up and shows a
 ---
 
 ## How accurate is it?
+
+### v10: held-out benchmark (`node tests/benchmark.js`, dashboard in `docs/benchmark.html`)
+Test half only: 2,339 human and 6,413 AI texts. Split by prompt group (texts written for the same prompt stay together), with Reuters journalists and duplicate learner essays grouped. 610 test documents that were near-copies of training documents were skipped.
+
+| Metric (overall) | v9 | v10 |
+|---|---|---|
+| Accuracy | 0.657 | **0.868** |
+| Precision | 0.997 | **0.999** |
+| Recall (AI caught) | 0.533 | **0.820** |
+| F1 | 0.695 | **0.901** |
+| False-positive rate (humans flagged) | 0.38% (9) | **0.13% (3)** |
+| False-negative rate | 0.467 | **0.180** |
+| ROC-AUC | 0.907 | **0.993** |
+| PR-AUC | 0.969 | **0.998** |
+| Calibration error (ECE) | 0.152 | **0.012** |
+| Humans landing in "inconclusive" | 2.7% | 4.2% |
+
+| Slice | Recall v9 → v10 | Humans flagged v9 → v10 | ROC-AUC v9 → v10 |
+|---|---|---|---|
+| Essays: student + university (810 human) | 56% → **85%** | 9 → **1** | 0.963 → 0.994 |
+| Stories: Reddit (450 human) | 22% → **62%** | 0 → 2 | 0.844 → 0.968 |
+| News: Reuters (132 human) | 5% → **49%** | 0 → 0 | 0.831 → 0.975 |
+| English-learner essays (875) | – | 0 → 0 | – |
+| AI written with other prompts | 65% → **91%** | | 0.974 → 0.999 |
+| Humaniser-tool AI news | 11% → **21%** | 0 → 0 | 0.338 → **0.995** |
+| Claude (2023) | 13% → **56%** | | 0.722 → 0.974 |
+| **Claude Opus 5.5, held out (24)** | 13% → **29%** | | 0.700 → 0.863 |
+| Opus 5.5 edited to sound like a student (15) | 0% → 0% (6 labelled "possibly edited AI") | | |
+| Paraphrased / perturbed AI news (7 kinds × 3 strengths) | 16–40% → **50–71%** | 0 → 0 | ~0.92 → ~0.98 |
+| Older Claude-written imitations (21) | 48% → 29% | | 0.963 → 0.993 |
+| GPTZero comparison set (60 ChatGPT, 63 human) | 8% → 7% | 0 → 0 | 0.540 → 0.904 |
+
+What this means:
+- **Humaniser text:** v10 *ranks* it almost perfectly above real news (AUC 0.995), but the cut-offs are set to protect people, so most of it still lands in "inconclusive" rather than "likely AI".
+- **Mixed essays** (375 held-out essays with a real AI paragraph pasted in): 10 spotted (v9: 11). The same essays without the AI paragraph were labelled Mixed or AI 5 times (v9: 12).
+- **The two flagged Reddit stories** are the only new false positives.
+
+**Limits of this benchmark:**
+- Almost all AI test text is from 2023 models (gpt-3.5-turbo, Claude 2).
+- Contemporary coverage is 24 held-out Claude Opus 5.5 texts written in this project.
+- No GPT-5/6, Gemini, DeepSeek or Llama samples were available (no API access in the build environment). Add them with `tests/data/samples/` and re-run.
+
 
 ### v9: bigger real-world test
 The Ghostbuster download was extended to 900 files per group, plus 300 AI news articles run through the "undetectable.ai" humaniser and 149 human / 142 ChatGPT texts from the dataset's GPTZero comparison: **5,303 human and 4,635 AI texts**. Split: files 1–150 and 301–600 for tuning, 151–300 and 601–900 kept back.
@@ -281,7 +342,10 @@ For comparison, Pangram, a commercial detector that runs a real AI model, report
 
 - **It misses most plain, edited or "humanised" AI text.** AI imitating a teen with lowercase starts and slang looks human to it.
 - **It's unreliable under about 150 words.**
-- **It misses most Claude Opus 5.5 text**: 8 of 40 real Opus 5.5 answers flagged. Once a person edits them, the best it can do is "Inconclusive: possibly edited AI" (6 of 15), and edited stories and essays usually get through.
+- **v10 still misses most Claude Opus 5.5 text**: 7 of 24 held-out Opus 5.5 texts flagged (29%), and edited Opus text at best gets "possibly edited AI".
+- **Humaniser tools:** v10 ranks humanised text well but only flags about 1 in 5, because the cut-offs protect people.
+- **Trained on 2023 AI text.** New models may write differently. The import folder (`tests/data/samples/`) and `node tests/train.js` let you retrain on new samples.
+- **Older notes below about v9 still apply to the rule engine.** Once a person edits them, the best it can do is "Inconclusive: possibly edited AI" (6 of 15), and edited stories and essays usually get through.
 - **The edited-AI check can be wrong about casual students.** A real student explaining something in a casual voice, with a story about their family, can trigger it (1 of 2,281 human texts did). That's why it stops at "Inconclusive". The real human test texts include few casual school answers, so the true false-alarm rate for teenagers could be higher.
 - **It misses most real chatbot text**: about 3 in 4 in the real-world test, and almost all Claude stories and news.
 - **Accuracy on today's chatbots is unknown.** The real chatbot test text is from 2023.
@@ -309,17 +373,27 @@ A 2023 Stanford study (Liang et al.) found commercial GPT detectors wrongly flag
 index.html                 ← the finished detector (generated: don't edit by hand)
 build.py                   ← builds index.html from src/
 src/
-  core.js                  ← the detection engine: cleaning, clues, scoring, attribution,
+  core.js                  ← rule engine: cleaning, clues, habit score, attribution,
                              sections, sliding window, cautions, style comparison
-  page_template.html       ← page layout, styles and UI code (placeholders /*CORE*/ and /*LABSAMPLES*/)
+  stats.js                 ← v10 statistical, structural and semantic feature extractors + genre guess
+  ensemble.js              ← v10 assessment: trained model + rule engine + recent-Claude check, confidence, evidence, out-of-distribution
+  model.json               ← trained weights (generated by tests/train.js)
+  page_template.html       ← page layout, styles and UI code (placeholders /*CORE*/, /*STATS*/, /*ENSEMBLE*/, /*MODEL*/, /*LABSAMPLES*/)
   testlab_samples.txt      ← the 20 built-in Test lab passages
+docs/
+  technical-assessment.md  ← v9 audit, v10 design and results
+  benchmark.html / .json   ← v9 vs v10 benchmark dashboard (generated by tests/benchmark.js)
 tests/
+  train.js                 ← trains src/model.json (group cross-validation, calibration, genre cut-offs)
+  benchmark.js             ← held-out benchmark: all metrics per genre, model family and editing condition
+  lib/datasets.js          ← loads every labelled dataset with model / genre / condition / group / split
   lab.js                   ← run Test lab-format files from the command line
   eval_corpus.js           ← score the larger labelled corpus per group
   eval_ghostbuster.js      ← score real human and real ChatGPT/Claude text (Ghostbuster dataset)
   data/
     fetch_ghostbuster.sh   ← downloads the Ghostbuster texts (not committed)
-    opus55/                ← 40 real Claude Opus 5.5 answers + 15 "human-refined" versions (Test lab format)
+    opus55/                ← 70 real Claude Opus 5.5 texts + 15 "human-refined" versions (Test lab format)
+    samples/               ← import your own labelled samples (.jsonl, see its README)
     make_dataset.py        ← assembles tests/data/dataset.json
     build_human.py         ← collects human prose from docs on the machine (not committed)
     extra_human.py         ← public-domain human passages (Austen, Twain, Lincoln…)
@@ -351,6 +425,11 @@ bash tests/data/fetch_ghostbuster.sh
 node tests/eval_ghostbuster.js tune       # look at this while changing weights
 node tests/eval_ghostbuster.js holdout    # check this at the end
 
+# v10: train the classifier (about 2 minutes) and run the held-out benchmark (about 1 minute)
+node tests/train.js
+python3 build.py
+node tests/benchmark.js        # writes docs/benchmark.html and docs/benchmark.json
+
 # real Claude Opus 5.5 answers
 node tests/lab.js tests/data/opus55/tune.txt
 node tests/lab.js tests/data/opus55/holdout.txt          # kept back for checking
@@ -379,6 +458,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
 | v8 | Tested with a real student's English essay (thanks to the owner). It scored 28, "Human-leaning", but the old Mixed rule labelled it "Mixed", and the same rule hit 76 of 2,056 real human texts. **New Mixed rule:** one non-final paragraph 70+ and 40+ above the rest; shading now marks that whole paragraph. Humans labelled Mixed 76 → 6 of 2,262. Scores and AI-leaning results unchanged |
 | v9 | Bigger real-data test (5,303 human / 4,635 AI texts, incl. humaniser-tool output). In-text citations as a human sign; lone AI words count 40%; weights re-fitted; Mixed threshold 72. Humans flagged 33 → 15, AI caught 30% → 33%, with no human group getting worse |
+| v10 | **Rebuilt detection engine.** Statistical, structural and semantic feature extractors; a trained, calibrated logistic ensemble (7 bootstrap members) with fairness constraints; a recent-Claude specialist; genre-aware cut-offs; length shrinkage, chunked long documents and out-of-distribution checks; confidence and evidence quality; paragraph-by-paragraph model scores. New dataset layer with group splits and a near-duplicate leakage check, paraphrase and perturbation test sets, an import folder for new models, a full benchmark (accuracy, precision, recall, F1, FPR, FNR, ROC-AUC, PR-AUC, ECE) and dashboard, and 30 more Opus 5.5 samples. Held-out: recall 53% → 82%, humans flagged 0.38% → 0.13%, AUC 0.907 → 0.993 |
 
 ---
 

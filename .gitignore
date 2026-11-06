@@ -3,3 +3,5 @@ tests/data/dataset.json
 __pycache__/
 *.png
 tests/data/ghostbuster/
+tests/data/samples/*.jsonl
+!tests/data/samples/*.public.jsonl

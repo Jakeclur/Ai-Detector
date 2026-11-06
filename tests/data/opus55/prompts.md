@@ -49,3 +49,13 @@ Every passage in `tune.txt` and `holdout.txt` is real Claude Opus 5.5 output (mo
 36. Explain black holes simply.
 39. Analyse the poem "Dulce et Decorum Est".
 40. Why did the Roman Empire fall?
+
+## Second batch (v10): extra_tune.txt (20) and extra_holdout.txt (10)
+
+Written later in the same session, in reply to the prompts below, to cover the genres where the detector was weakest (stories, news, essays, emails, technical writing). The same caveat applies: the model knew these were for a detector.
+
+extra_tune.txt: 1–5 short stories (an inherited island house, a town power outage, a care robot, a haunted office printer, a letter delivered 40 years late); 6–8 news reports (a Hobart rail-trail decision, a weed that cleans contaminated soil, a Queensland school phone ban); 9–11 essays (ambition in Macbeth, the Depression and the Nazi rise, compulsory voting); 12–15 emails (shift handover to a co-worker, a parent to a teacher, a project update, a faulty-boots complaint); 16 how-to (two-factor authentication); 17 lab report (enzymes and temperature); 18 technical explanation ("works on my machine"); 19 book review; 20 meeting minutes.
+
+extra_holdout.txt: 1–3 short stories (a reopened bakery, a ghost ship at a lighthouse, a grandmother who notices); 4–5 news reports (Melbourne contactless fares, loggerhead turtle nests); 6–7 essays (the Eureka Stockade, social media and young people); 8 email (quitting a basketball team); 9 explanation (mortgage offset accounts); 10 excursion reflection.
+
+Names, places, organisations and figures in these passages are invented for the writing tasks (the news reports are fictional).

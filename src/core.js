@@ -465,8 +465,8 @@ function suspect(text, r, a) {
     const who = a.lean === "claude" || c.shapeN >= 1 ? "The leftover structure looks most like Claude (Opus 5.5)." : a.lean === "chatgpt" ? "The leftover structure looks most like ChatGPT." : "Not enough clues to say which AI.";
     return { short: "edited AI?", label: "Possibly AI that a person has edited", detail: `Casual touches sit on top of an AI-style explanation skeleton (see the edited-AI check). ${who} Students writing casually can also look like this, so treat it as a reason to ask questions, not as proof.`, version: "edited", confidence: "low" };
   }
-  const looksAI = r.score >= 55 || c.hard > 0;
-  const maybeAI = r.score >= 35 || r.band === "mixed";
+  const looksAI = r.band === "ai" || c.hard > 0;
+  const maybeAI = ["inconclusive", "mixed", "edited"].includes(r.band);
   const lean = a.lean;
   let name = null, version = "", why = "";
   if (lean === "claude") {
@@ -481,6 +481,8 @@ function suspect(text, r, a) {
   }
   const SHORT = { "claude-old": "older Claude", "claude-opus-5.5": "Claude Opus 5.5", "gpt-new": "ChatGPT (GPT-5/6)", "gpt-old": "ChatGPT (GPT-4 style)", gpt: "ChatGPT-like" };
   const edNote = c.edited === 1 ? ` A few signs of edited AI were found (${c.edHumanEv.concat(c.edSkelEv).join(", ")}), but not enough to suspect it.` : "";
+  // the trained recent-Claude specialist (v10) fired
+  if (!name && r.specialist) { name = "Claude Opus 5.5 (or another recent Claude)"; version = "claude-opus-5.5"; why = "The model trained on recent Claude writing matched this text, although the word-level Claude clues are weak."; }
   if (!looksAI && !maybeAI) return { short: "none", label: "No AI suspected", detail: (name ? `Few AI habits overall. If AI was used, the closest match is ${name}.` : "Few AI habits, and no model-specific clues.") + edNote, version: "none", confidence: "none" };
   if (!name) return { short: looksAI ? "AI, unclear which" : "can't tell", label: looksAI ? "An AI model, but it's not clear which" : "Can't tell", detail: looksAI ? "Many AI habits, but no clear Claude or ChatGPT clues. It could be another model, or edited text." : r.band === "mixed" ? "Part of the text shows many AI habits, but there aren't enough model-specific clues to say which AI." : "Not enough evidence of AI, and no model stands out.", version: "unknown", confidence: "none" };
   return { short: SHORT[version], label: name, detail: why + (looksAI ? "" : " The overall score is inconclusive, so this is only a possibility."), version, confidence: looksAI ? a.confidence : "low" };
@@ -608,4 +610,4 @@ function compareStyles(known, unknown) {
   return { delta, level, diffs, nA: A.n, nB: B.n };
 }
 // ==/CORE==
-if (typeof module !== "undefined") module.exports = { mixedCheck, MIXED_RULE, suspect, compareStyles, englishCoverage, cleanText, features, analyze, scoreFeatures, MODEL, BANDS, attribute, segments, slidingWindow, cautions, nWords };
+if (typeof module !== "undefined") module.exports = { paraSplit, mixedCheck, MIXED_RULE, suspect, compareStyles, englishCoverage, cleanText, features, analyze, scoreFeatures, MODEL, BANDS, attribute, segments, slidingWindow, cautions, nWords };

@@ -12,7 +12,7 @@ This file gives a Claude Code session the full context of how this project was b
 2. **Keep:** the per-clue bars, highlights in the text, the section-by-section scan, the Compare tab and the Test lab.
 3. **Never claim certainty.** A high score = "look closer", never proof. Confidence labels are only "low" or "medium". Keep the warnings.
 4. **Fairness:** don't score vocabulary richness or word length. Don't treat contractions or casual style as AI signs. Show cautions for formal, plain, list-heavy, short and casual-but-tidy text.
-5. **Don't add a neural model unless it can actually be tested working.** Not done so far; it couldn't be tested in the build environment.
+5. **Don't add a neural model unless it can actually be tested working.** Still no neural model. v10 adds a *trained linear classifier* (logistic regression, weights in `src/model.json`), which was trained and validated on held-out data in the build environment, as the owner's v10 brief asked.
 6. **Never accept a tuning change that wrongly flags more human text.** False positives on real people (especially teens and non-native writers) matter more than catching more AI.
 7. Detect any AI model, but be especially good at Claude and ChatGPT, and say which one a text looks more like (Claude-leaning / ChatGPT-leaning / other or can't tell).
 
@@ -24,7 +24,16 @@ This file gives a Claude Code session the full context of how this project was b
 - No npm or pip packages are required.
 - For a visual check, open `index.html` in a browser and click each sample button, the Compare example and "Load 20 sample passages" in the Test lab. There should be no console errors.
 
-## Architecture (src/core.js)
+## Architecture v10 (read this first)
+- **Pipeline:** `ensemble.js: assess(raw)` → `cleanText` → `core.analyze` (rule clues, v9 habit score kept as `rulesScore`) + `stats.styleFeatures` (statistical / structural / semantic features) + `guessGenre` → `modelScore` (trained ensemble in `DETECTOR_MODEL` = `src/model.json`) → genre-aware cut-offs → band `human | inconclusive | ai` (+ `edited`, `mixed` from the old checks) → `likelihood` (calibrated %, also written to `score`), `confidence` (low/medium), `evidence` (limited/moderate/good), `uncertainty` reasons, `ood`.
+- **Model:** logistic regression over [27 rule clues | 33 style features | ~300 common-token frequencies], standardised; 7 bootstrap members (spread → `pLow/pHigh`, confidence); Platt calibration with balanced classes on group-5-fold out-of-fold scores; length shrink of the logit (min 0.3 at 40 words, full at 300); cut-offs: AI ≥ 99.7th percentile of OOF human scores (stricter per genre), "likely human" ≤ 95th percentile per genre. Sign constraints: rule clues keep direction, apostrophe/slang tokens ≤ 0. Human weight 2, Opus weight 8.
+- **Specialist** `claude-modern` (in `model.json.specialists`): same features, trained on Opus 5.5 vs humans only, cut at the 99.8th percentile of OOF human scores. Fires → band `ai`, suspect = Claude Opus 5.5. Disabled for out-of-distribution text unless the general p ≥ 0.995.
+- **Long texts** (> 1,500 words): `chunkedScore` scores ~600-word chunks and combines them (a single long document drifted out of distribution and once triggered the specialist on joined human essays).
+- **OOD:** ≥ 3 standardised features outside the training range by 25%, poem/list layouts (`layoutOdd`), or non-English → logit × 0.25 and never "likely AI" unless p ≥ 0.995 or a hard giveaway.
+- **Rebuild model:** `node tests/train.js` (about 2 min) → `python3 build.py` → `node tests/benchmark.js` (about 1 min; writes `docs/benchmark.html/json`). `tests/lib/datasets.js` loads all data with group splits and `markLeaks` (near-duplicate check). Import new samples via `tests/data/samples/*.jsonl`.
+- **`suspect()` and the page are band-based** since v10 (not score ≥ 55). The Test lab slider's far-left value means "auto" (the detector's own cut-offs).
+
+## Architecture (src/core.js, the rule engine)
 - `cleanText(raw)` → `{text, notes}`: strips zero-width and hidden characters, normalises odd spaces, converts full-width characters, folds Cyrillic/Greek look-alikes **only inside words that also contain Latin letters**, and straightens quotes. The page shows a notice from `notes`.
 - `features(text)` → rates for ~25 clues plus `counts` (for UI text) and `hits` (highlight ranges: `{start, end, type, label}` with types `hard | word | phrase | struct | trans`).
 - `MODEL` = `{bias, w, cap}`: logistic model `z = bias + Σ w·min(f, cap)`. Current bias **-2.1** (v9). v9 weights = constrained logistic fit (humans 3×, signs kept, L2 towards v8) on the bigger Ghostbuster tune split (files ≤150 and 301–600) + repo corpus + lab + Opus tune, then `extreme`/`cv` pinned to v8 (the fit weakened them and flagged Reddit stories) and `vocab` set to 0.8 (fit wanted 1.19, which flagged a university essay). New `cite` feature (in-text citations; −0.95). `vocab` now ×0.4 when only one distinct AI word appears.
@@ -82,6 +91,12 @@ This file gives a Claude Code session the full context of how this project was b
 - Humans flagged 33 → 15 (every group ≤ v8; learners 6 → 1); AI 30.2% → 32.5%; hold-out humans 13 → 8, AI 32.1% → 34.8%. Mixed labels on humans 22 → 17 with MIXED_RULE.para 72 (synthetic pasted-AI essays 24 → 26 of ~195). Own corpus AI 21 → 20 of 53; lab and Opus unchanged.
 - Remaining human false flags are mostly IvyPanda student essays heavy on "serves as", "plays a crucial role", "Moreover", even rhythm.
 
+## v10 results (held-out benchmark, docs/benchmark.html)
+- 2,339 human / 6,413 AI test texts (610 near-copies skipped). v9 → v10: recall 53.3% → 82.0%, humans flagged 9 → 3 (0.38% → 0.13%), AUC 0.907 → 0.993, PR-AUC 0.969 → 0.998, ECE 0.152 → 0.012, F1 0.695 → 0.901. Essays recall 56 → 85% (human FP 9 → 1); stories 22 → 62% (FP 0 → 2); news 5 → 49%; Claude 2023 13 → 56%; Opus 5.5 held-out 13 → 29% (7/24); paraphrased/perturbed 16–40% → 50–71%; humaniser 11 → 21% (AUC 0.995); older Claude-written imitations 48 → 29%.
+- Owner's English essay: 24, "Likely human-written".
+- Rejected in v10: unshrunk short texts (a 43-word human post scored 99); loose "other"-genre cut-off; gptzero as test-only (casual human Q&A was missing from training; now split 50/50); a 13% human inconclusive rate (human cut moved from the 85th to the 95th percentile); applying the specialist to whole long documents.
+- Opus 5.5 data now: 70 texts (46 train / 24 test) + 15 edited. All written by Opus 5.5 in this repo's session (contamination caveat in `tests/data/opus55/prompts.md`).
+
 ## Decisions and rejected ideas
 - **v5 fairness fixes (from real learner essays):** "I hope this helps" is a stock phrase, not a certain giveaway (a Reddit writer used it); "I think" doesn't count as casual for the too-clean rule; the hopeful-ending clue needs dialogue or fiction clichés; lists of -ing words aren't trailing clauses; each AI word counts at most twice and tier-1 everyday words count half; "Copy code" only counts on its own line.
 - **Rejected:** contractions as an AI sign. An automatic logistic fit wanted it only because the human corpus was formal; it would flag real teens.
@@ -93,6 +108,7 @@ This file gives a Claude Code session the full context of how this project was b
 - A missing final full stop only counts as a human slip when the last line is over 6 words (email sign-offs like "Best, Alex" were being counted).
 
 ## Known weak spots / next steps
+0. **v10 next steps:** real GPT-5/6, Gemini, DeepSeek and Llama samples via `tests/data/samples/` (no API keys were available); real Claude output from claude.ai collected without detector context; real human-edited AI text; more casual human writing (the genre guess often misses Reddit stories, so 11% of them land in "inconclusive"); a neural perplexity feature only if it can run and be tested in the page.
 1. **Tune on real modern data.** Ghostbuster (2023 models) is now used; still needed: real 2026 ChatGPT/Claude output and real teen writing. The owner is collecting real ChatGPT output, Claude output, their own writing and friends' casual writing, and will paste Test lab results. Use them to re-fit weights. Keep human false positives at 0 and check the human max score stays well below 55.
 2. AI told to write like a teen with lowercase starts and slang currently looks human (slips outweigh everything). Any fix must not flag real teens. Only change it with real teen text to test against.
 3. AI emails are mostly missed; plain AI emails look like competent human emails.
