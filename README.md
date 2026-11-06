@@ -244,7 +244,10 @@ What changed in v11:
 - **Version hints come from the recent-Claude model.** 76% of 2023 Claude texts are now called "older Claude"; 23 of 25 flagged Opus 5.5 texts are called "Claude Opus 5.5".
 - **40 more Opus 5.5 samples** (110 + 15 edited in total).
 
+**Also in v11 (later the same day):** a trained genre classifier (right 84.6% of the time on held-out texts, vs 35.9% for the old hand-written genre guess) now picks the "Type of writing" shown on the page. It isn't used for the cut-offs: that was tested, and it made results slightly worse (2 → 3 humans flagged, news recall 60% → 46%).
+
 **Tried and rejected:**
+- Training-time augmentation (comma dropping, sentence merging and splitting, word swaps, mimicking humaniser tools): recall fell 83% → 78% and every paraphrase category got worse.
 - A word-class pattern feature: no consistent gain.
 - A 99.3rd-percentile cut-off: it flagged 0.7% of humans after retraining, exactly as its percentile implies.
 - A higher Opus training weight: no gain, more false flags.

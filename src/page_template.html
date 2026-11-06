@@ -590,7 +590,7 @@ if (typeof document !== "undefined") {
     document.querySelector(".meter").style.background = `linear-gradient(90deg, var(--human) 0%, var(--human) ${ch}%, var(--mixed) ${ch + 1}%, var(--mixed) ${ca - 1}%, var(--ai) ${ca}%, var(--ai) 100%)`;
     $("scale").style.display = "flex"; $("scale").style.justifyContent = "space-between";
     $("scale").innerHTML = `<span>0–${ch} likely human</span><span>inconclusive</span><span>${ca}–100 likely AI</span>`;
-    const GENRE = { academic: "essay / academic", creative: "story / creative", news: "news report", explanation: "explanation / how-to", conversational: "email or message", other: "general" };
+    const GENRE = { academic: "essay / academic", creative: "story / creative", news: "news report", explanation: "explanation / how-to", conversational: "email or message", learner: "short opinion essay", other: "general" };
     $("facts").innerHTML = [
       ["Text length", plural(r.wc, "word")],
       ["Paragraphs analysed", String(r.paras.length || 1)],

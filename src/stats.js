@@ -118,7 +118,11 @@ function styleFeatures(text) {
     tmpl_rep: tmplRep, parallel: sents.length > 1 ? parallel / (sents.length - 1) : 0, open_rep: openRep, discourse,
     ov_mean: ovMean, ov_sd: ovSd, intro_concl: introConcl, tri_rep: triRep
   };
-  return { f, tok: counts, cls, n: tok.length, obs: { mattr: k ? mattr / k : 0, wordLen: words.reduce((a, w) => a + w.length, 0) / n, sentences: lens.length, paragraphs: paras.length } };
+  // hashed character 3-grams over lower-cased text (optional model family "chr")
+  const chr = new Float64Array(512); const lowT = text.toLowerCase().replace(/\s+/g, " ");
+  for (let i = 0; i + 3 <= lowT.length; i++) { let h = 2166136261; for (let k = 0; k < 3; k++) { h ^= lowT.charCodeAt(i + k); h = Math.imul(h, 16777619); } chr[(h >>> 0) % 512]++; }
+  const nc = Math.max(1, lowT.length - 2); for (let i = 0; i < 512; i++) chr[i] = Math.sqrt(chr[i] / nc * 1000);
+  return { f, tok: counts, cls, chr, n: tok.length, obs: { mattr: k ? mattr / k : 0, wordLen: words.reduce((a, w) => a + w.length, 0) / n, sentences: lens.length, paragraphs: paras.length } };
 }
 
 // Rough genre guess, used for genre-aware cut-offs and for the out-of-distribution check.

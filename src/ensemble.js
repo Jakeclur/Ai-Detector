@@ -33,6 +33,14 @@ function gbdtLogit(G, v) {
   for (const t of G.trees) { let k = 0; for (;;) { const nd = t[k]; if (nd.length === 1) { z += nd[0]; break; } k = v[nd[0]] <= nd[1] ? nd[2] : nd[3]; } }
   return z;
 }
+// v12: trained genre classifier (falls back to the heuristic guessGenre)
+function predictGenre(R, sf) {
+  const G = typeof DETECTOR_MODEL !== "undefined" && DETECTOR_MODEL ? DETECTOR_MODEL.genreModel : null;
+  if (!G) return null;
+  const v = modelVector({ features: G.features, ruleKeys: [], styleKeys: G.styleKeys, vocab: G.vocab, mu: G.mu, sd: G.sd }, R, sf);
+  const d = v.length, s = G.W.map(w => { let z = w[d]; for (let j = 0; j < d; j++) z += w[j] * v[j]; return z; });
+  return G.classes[s.indexOf(Math.max(...s))];
+}
 // Score a text with the trained model. Returns null when no model is loaded.
 function modelScore(text, R, sf) {
   const M = typeof DETECTOR_MODEL !== "undefined" ? DETECTOR_MODEL : null;
@@ -89,7 +97,10 @@ function assess(raw, opts = {}) {
   r.text = text; r.cleanNotes = cl.notes;
   let sf = null, m = null;
   try {
-    sf = styleFeatures(text); r.genre = guessGenre(text, sf); m = modelScore(text, r, sf);
+    sf = styleFeatures(text);
+    r.cutGenre = guessGenre(text, sf);              // the genre the cut-offs were calibrated with
+    r.genre = predictGenre(r, sf) || r.cutGenre;    // more accurate type of writing, for display
+    m = modelScore(text, r, sf);
     // Long documents: the model was trained on texts up to ~1,500 words, and whole-document features
     // (paragraph counts, repeated phrases) drift with length. Score ~600-word chunks and combine them.
     if (m && r.wc > 1500) m = chunkedScore(text, m);
@@ -97,7 +108,7 @@ function assess(raw, opts = {}) {
   r.rulesScore = r.score;                       // v9 habit score, still shown in the clue panel
   r.model = m;
   if (m) {
-    const g = r.genre && m.cut.genre[r.genre] != null ? r.genre : "other";
+    const g = r.cutGenre && m.cut.genre[r.cutGenre] != null ? r.cutGenre : "other";
     const cutAI = m.cut.genre[g] ?? m.cut.ai;
     // a specialist only counts when the general model gives at least some support (stops extreme disagreements)
     const hit = m.spec.filter(s => s.p >= s.cut && m.p >= s.minGeneral);
@@ -140,7 +151,7 @@ function assess(raw, opts = {}) {
     m && !r.agree ? `The rule clues (${r.rulesScore}) and the trained model (${r.likelihood}) disagree.` : "",
     uncertain ? `The model's ensemble members disagree: the estimate could be anywhere from about ${Math.round(m.pLow * 100)} to ${Math.round(m.pHigh * 100)}.` : "",
     r.ood ? "This text is unlike the texts the model was trained on (unusual style, layout or language), so the estimate is less reliable." : "",
-    r.genre && r.genre !== "other" ? "" : "The type of writing wasn't clear, so a general cut-off was used."
+    r.cutGenre && r.cutGenre !== "other" ? "" : "The type of writing wasn't clear, so a general (stricter) cut-off was used."
   ].filter(Boolean);
   r.obs = sf ? sf.obs : null;
   // attribution: trained Claude-vs-ChatGPT model, refining the rule-based clues

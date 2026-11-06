@@ -103,6 +103,8 @@ This file gives a Claude Code session the full context of how this project was b
 - Attribution (when a model is named): ChatGPT 99%, Claude 2023 91%, Opus 5.5 88%, humanised ChatGPT 97% (old rule clues: 2–28%).
 - Rejected in v11: word-class bigram profile (no consistent gain; code kept, `useClass` off); 99.3rd-percentile cut-off (0.7% FP after retraining, as the percentile implies); Opus weight 16/30 (no gain / more FP); model-based Mixed rule (no better); looser "other"-genre cut (its top human OOF scores are ordinary prose).
 - Opus 5.5 data: 110 texts (71 train / 39 test) + 15 edited.
+- Genre classifier (`model.json.genreModel`, softmax over style + token features, 84.6% held-out vs 35.9% heuristic) sets `r.genre` for display only; cut-offs use `r.cutGenre` = heuristic `guessGenre` (using the classifier for cut-offs made results worse: FP 2→3, news recall 60→46%).
+- Rejected: training-time augmentation (`tests/lib/augment.js`, kept for reference): recall 83→78%, every perturbation category worse.
 
 ## Decisions and rejected ideas
 - **v5 fairness fixes (from real learner essays):** "I hope this helps" is a stock phrase, not a certain giveaway (a Reddit writer used it); "I think" doesn't count as casual for the too-clean rule; the hopeful-ending clue needs dialogue or fiction clichés; lists of -ing words aren't trailing clauses; each AI word counts at most twice and tier-1 everyday words count half; "Copy code" only counts on its own line.

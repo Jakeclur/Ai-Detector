@@ -34,7 +34,7 @@ function extract(doc) {
   const text = E.cleanText(doc.text).text;
   if (E.nWords(text) < 40) return null;
   const F = E.features(text), sf = S.styleFeatures(text);
-  return { rules: F.f, style: sf.f, tok: sf.tok, cls: sf.cls, n: sf.n, genre: S.guessGenre(text, sf), wc: F.wc };
+  return { rules: F.f, style: sf.f, tok: sf.tok, cls: sf.cls, chr: sf.chr, n: sf.n, genre: S.guessGenre(text, sf), wc: F.wc };
 }
 
 function buildVocab(rows) {
@@ -57,6 +57,7 @@ function vectorise(x, spec) {
   if (spec.useStyle) for (const k of spec.styleKeys) v[i++] = x.style[k];
   if (spec.useVocab) { const n = Math.max(1, x.n); for (const t of spec.vocab) v[i++] = Math.sqrt((x.tok.get(t) || 0) / n * 100); }
   if (spec.useClass) { const n = Math.max(1, x.n); for (const t of spec.classVocab) v[i++] = Math.sqrt((x.cls.get(t) || 0) / n * 100); }
+  if (spec.useChr) for (let k = 0; k < 512; k++) v[i++] = x.chr[k];
   return v;
 }
 
@@ -64,7 +65,7 @@ function makeSpec(rows, opts) {
   const styleKeys = Object.keys(rows[0].x.style);
   const vocab = opts.useVocab ? buildVocab(rows) : [];
   const classVocab = opts.useClass ? buildClassVocab(rows, opts.classN || 200) : [];
-  const names = [...(opts.useRules ? RULE_KEYS.map(k => "rule:" + k) : []), ...(opts.useStyle ? styleKeys.map(k => "style:" + k) : []), ...vocab.map(t => "tok:" + t), ...classVocab.map(t => "cls:" + t)];
+  const names = [...(opts.useRules ? RULE_KEYS.map(k => "rule:" + k) : []), ...(opts.useStyle ? styleKeys.map(k => "style:" + k) : []), ...vocab.map(t => "tok:" + t), ...classVocab.map(t => "cls:" + t), ...(opts.useChr ? Array.from({ length: 512 }, (_, k) => "chr:" + k) : [])];
   const sign = names.map(n => n.startsWith("rule:") ? RULE_SIGN[n.slice(5)] : n.startsWith("tok:") && FAIR_NEG.test(n.slice(4)) ? -1 : n.startsWith("cls:") && n.includes("CONTR") ? -1 : 0);
   return { ...opts, styleKeys, vocab, classVocab, names, sign };
 }
@@ -156,7 +157,7 @@ function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2
   const humP = rows.map((r, i) => [r, prob(oof[i])]).filter(([r]) => !r.y);
   const globalHi = pct(humP.map(x => x[1]), hiPct), globalLo = Math.max(0.5, pct(humP.map(x => x[1]), 0.95));
   const genreCut = {}, genreLo = {};
-  for (const g of ["academic", "creative", "news", "explanation", "conversational", "other"]) {
+  for (const g of ["academic", "creative", "news", "explanation", "conversational", "learner", "other"]) {
     const ps = humP.filter(([r]) => r.x.genre === g).map(x => x[1]);
     // genres with few human examples get a stricter cut-off
     genreCut[g] = ps.length >= 100 ? Math.max(globalHi, pct(ps, genrePct)) : Math.max(globalHi, ps.length ? Math.max(...ps) : globalHi, 0.97);
@@ -178,6 +179,32 @@ function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2
   // boosted trees on all training data (monotone constraints from the same fairness signs)
   const gb = gbdt ? GB.fitGBDT(Z, rows.map(r => r.y), weightsFor(rows), { ...GBDT_OPTS, sign: spec.sign }) : null;
   return { spec, mu, sd, members: ms, gbdt: gb, cal, cut: { lo: globalLo, hi: globalHi, genre: genreCut, genreLo }, oof, range: { lo, hi } };
+}
+
+// ---------- genre classifier (v12): softmax regression over style + common-token features ----------
+const GENRES = ["academic", "creative", "news", "explanation", "conversational", "learner", "other"];
+const genreLabel = d => d.genre === "docs" ? "other" : GENRES.includes(d.genre) ? d.genre : "other";
+function trainGenre(rows) {
+  const spec = makeSpec(rows, { useRules: false, useStyle: true, useVocab: true });
+  const X = rows.map(r => vectorise(r.x, spec));
+  const { mu, sd } = standardise(X, spec);
+  const Z = X.map(v => v.map((x, j) => (x - mu[j]) / sd[j]));
+  const y = rows.map(r => GENRES.indexOf(genreLabel(r.doc)));
+  const K = GENRES.length, d = spec.names.length, W = Array.from({ length: K }, () => new Float64Array(d + 1));
+  const cnt = GENRES.map((_, k) => y.filter(v => v === k).length), cw = cnt.map(c => c ? rows.length / (K * c) : 0);
+  for (let it = 0; it < 300; it++) {
+    const g = Array.from({ length: K }, () => new Float64Array(d + 1));
+    for (let i = 0; i < Z.length; i++) {
+      const x = Z[i], s = W.map(w => { let z = w[d]; for (let j = 0; j < d; j++) z += w[j] * x[j]; return z; });
+      const mx = Math.max(...s), e = s.map(v => Math.exp(v - mx)), se = e.reduce((a, b) => a + b);
+      for (let k = 0; k < K; k++) { const err = (e[k] / se - (y[i] === k ? 1 : 0)) * cw[y[i]]; for (let j = 0; j < d; j++) g[k][j] += err * x[j]; g[k][d] += err; }
+    }
+    for (let k = 0; k < K; k++) for (let j = 0; j <= d; j++) W[k][j] -= 0.5 * (g[k][j] / Z.length + (j < d ? 0.001 * W[k][j] : 0));
+  }
+  const r5 = a => Array.from(a, v => +v.toFixed(5));
+  const model = { classes: GENRES, features: spec.names, styleKeys: spec.styleKeys, vocab: spec.vocab, mu: r5(mu), sd: r5(sd), W: W.map(r5) };
+  const predict = x => { const v = vectorise(x, spec).map((t, j) => (t - mu[j]) / sd[j]); const s = W.map(w => { let z = w[d]; for (let j = 0; j < d; j++) z += w[j] * v[j]; return z; }); return GENRES[s.indexOf(Math.max(...s))]; };
+  return { model, predict };
 }
 
 function loadRows(split) {
@@ -206,12 +233,16 @@ function toJSON(M) {
   };
 }
 
-module.exports = { extract, trainAll, loadRows, vectorise, logit, toJSON, RULE_KEYS, lenFactor };
+module.exports = { extract, trainAll, trainGenre, loadRows, vectorise, logit, toJSON, RULE_KEYS, lenFactor };
 
 if (require.main === module) {
   const t0 = Date.now();
   const rows = loadRows("train");
   console.log(`training rows: ${rows.length} (${rows.filter(r => !r.y).length} human, ${rows.filter(r => r.y).length} AI) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+  // 0) genre classifier, for the "type of writing" shown on the page (84.6% held-out accuracy vs 35.9% for the
+  //    heuristic). The cut-offs still use the heuristic genre: using the classifier for cut-offs was tested and made
+  //    results slightly worse (zero-sum: tighter genres also move the high-scoring humans).
+  const GM = trainGenre(rows);
   // 1) general model: every training text
   // cut-offs at the 99.8th / 99.9th percentile of out-of-fold human scores: by construction about 0.1-0.2% of real
   // people score above them. (A 99.3rd-percentile cut-off looked good on one held-out run but flagged 0.7% of humans
@@ -236,6 +267,7 @@ if (require.main === module) {
   const A = toJSON(trainAll(at, { useRules: true, useStyle: true, useVocab: true, modernWeight: 5, humanWeight: 1 }, { l2: 0.01, gbdt: true, members: 3 }));
   json.attribution = { classes: ["chatgpt", "claude"], features: A.features, ruleKeys: A.ruleKeys, styleKeys: A.styleKeys, vocab: A.vocab, mu: A.mu, sd: A.sd,
     members: A.members, calibration: A.calibration, length: A.length, gbdt: A.gbdt, trainedOn: `${at.filter(r => r.y).length} Claude and ${at.filter(r => !r.y).length} ChatGPT texts` };
+  json.genreModel = GM.model;
   fs.writeFileSync(OUT, JSON.stringify(json));
   console.log(`wrote ${OUT} (${(fs.statSync(OUT).size / 1024).toFixed(0)} KB) in ${((Date.now() - t0) / 1000).toFixed(0)}s; cut-offs`, json.cutoffs, "specialist cut", S.cutoffs.ai);
 }
