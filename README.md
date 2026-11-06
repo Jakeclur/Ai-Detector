@@ -7,7 +7,7 @@ A rules-based AI-writing detector that runs entirely in your web browser. Paste 
 - **which chatbot it looks more like**, Claude or ChatGPT, with an honest confidence level
 - a **bar for every clue**, showing what pushed the score up or down
 - **highlights in the text**, so you can see exactly what was flagged and why
-- a **section-by-section scan** and **sliding window**, which pick out a pasted AI paragraph inside human writing
+- a **section-by-section scan**, and a **Mixed** result that shades one paragraph when it stands out as far more AI-like than the rest
 
 It also has a **Compare** tab, which checks whether a text matches someone's known writing style, and a **Test lab** tab for testing the detector on your own labelled examples.
 
@@ -56,14 +56,14 @@ There is no AI model inside, and nothing you paste is sent anywhere.
   | 0–34 | Human-leaning |
   | 35–54 | Inconclusive |
   | 55–100 | AI-leaning |
-  | any | **Mixed**, when one stretch of the text scores 65–70+ while another scores 35 or below |
+  | any | **Mixed**, when one paragraph (not the last) scores 70+ on its own and 40+ points above the median of the other paragraphs |
 
   Short texts are pulled towards the middle, because less text means less evidence.
 - **Certain giveaways box:** leftover chatbot lines such as "As an AI language model", "Would you like me to…", "[Your Name]" or ChatGPT citation codes (`oaicite`, `utm_source=chatgpt.com`).
 - **Caution box:** warns when the text is formal, very plain, mostly a list, short, or casual-but-very-tidy, because careful human writing in those styles can look AI-like.
 - **Which AI does it look more like?** A Claude ↔ ChatGPT bar with the evidence for each side.
 - **Section by section:** each paragraph (or ~110-word chunk) scored on its own.
-- **Sliding window:** half-overlapping ~90-word windows. Sentences in a stretch scoring 65+ are shaded in the flagged text.
+- **Stand-out paragraph:** when one paragraph scores 70+ and 40+ points above the others, the result is "Mixed" and that paragraph is shaded in the flagged text.
 - **Copy summary:** a plain-text summary of the result.
 
 ### Compare with known writing
@@ -102,7 +102,7 @@ Labels can be `Human`, `Claude`, `ChatGPT` (or `GPT`/`OpenAI`), or `AI` for any 
 2. **Measure about 25 clues** (listed below). Each one is a rate, such as "per 100 words" or "per sentence", or a yes/no.
 3. **Combine** them with a logistic model: `z = bias + Σ weight × min(clue, cap)`, then `p = 1 / (1 + e^-z)`. Caps stop any single clue from dominating.
 4. **Shrink short texts** towards 50%: `score = 50 + (p − 50) × (0.5 + 0.5 × confidence)`, where confidence rises from 0 at 40 words to 1 at 300 words.
-5. **Band** the score. Any certain giveaway with a score of 45+ forces "AI-leaning". A big gap between sections forces "Mixed".
+5. **Band** the score. Any certain giveaway with a score of 45+ forces "AI-leaning". One paragraph standing far above the others forces "Mixed".
 6. **Attribute** separately, using Claude and ChatGPT fingerprint clues (see below).
 
 The weights were set by hand from the research, then checked against a labelled test set. Clues based on something being *absent* (few names and numbers, even rhythm) have small weights, so they can never push a text high on their own.
@@ -231,7 +231,17 @@ v4 caught more of these (47% vs 40% overall), mostly through the "tidy hopeful e
 - Model guess: **8 right, 0 wrong, 3 "can't tell"**.
 
 ### Mixed text
-An essay made of 3 human paragraphs plus 1 pasted AI paragraph scored **22** overall and was labelled **"Mixed"**. The AI paragraph's section scored **68**, and the sliding window reached **71**.
+**v8 fix, found with a real student's essay.** The old Mixed rule (any ~90-word window scoring 70+ while another scored 35 or less) would have labelled **76 of 2,056 real human texts** "Mixed": 37 of 299 student essays, 34 of 300 university essays, and the student's own English essay. Formal essays naturally have one stretch with "In conclusion" and a few ", evoking…" clauses, and single windows are too jumpy.
+
+The new rule needs one paragraph (not the last, since conclusions naturally read like summaries) to score **70+** on its own and sit **40+ points above** the median of the other paragraphs.
+
+| | Old rule | New rule |
+|---|---|---|
+| Real human texts labelled Mixed | 76 of 2,056 | **6 of 2,262** |
+| The student's essay | Mixed | Human-leaning, nothing shaded |
+| Real student essays with one real ChatGPT/Claude paragraph pasted in (193) | 49 spotted | 24 spotted |
+
+So it now misses more pasted paragraphs, but it far less often points at a real person's paragraph. The built-in demo (3 human paragraphs + 1 AI paragraph) scores 26 overall, "Mixed", with the AI paragraph shaded (75 vs about 21 for the rest).
 
 ### ⚠️ Why these numbers are limited
 - **The real chatbot text is from 2023.** Today's ChatGPT and Claude write differently (for example, Claude Opus 5.5 hardly uses em dashes).
@@ -345,6 +355,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v5 | Tested on real data (2,056 human and 1,800 ChatGPT/Claude texts from the Ghostbuster dataset). Fixed clues that wrongly flagged students and English learners ("I hope this helps" as a certain giveaway, "I think" as casual, hopeful endings in essays, lists of -ing words, repeated everyday words). Weights re-fitted (70% hand-set, 30% fitted). Humans flagged 19 → 10, real AI caught 23% → 25%. Added "Introduction:"-style labels and a few measured words. Fixed .docx error message and Test lab model check |
 | v6 | Studied 40 real Claude Opus 5.5 answers (v5 caught 0 of them). New "Opus 5.5 answer shape" clue (label-style paragraphs, colon lists, one-sentence openers, "that's why", "the good news is"); "if you paste…, I can…" offers. Opus 5.5 caught 0 → 8 of 40, with no extra humans flagged. New **Suspected AI** line on every result, with a version guess (Claude Opus 5.5, older Claude, ChatGPT GPT-5/6 or GPT-4-style). Single line breaks count as paragraphs when there are no blank lines. "Real Claude Opus 5.5 answer" sample button |
 | v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
+| v8 | Tested with a real student's English essay (thanks to the owner). It scored 28, "Human-leaning", but the old Mixed rule labelled it "Mixed", and the same rule hit 76 of 2,056 real human texts. **New Mixed rule:** one non-final paragraph 70+ and 40+ above the rest; shading now marks that whole paragraph. Humans labelled Mixed 76 → 6 of 2,262. Scores and AI-leaning results unchanged |
 
 ---
 

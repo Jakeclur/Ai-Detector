@@ -1,6 +1,6 @@
 // ==CORE==
 /* =====================================================================
-   AI Text Detector engine (v7). Rules only: no trained text model, no network.
+   AI Text Detector engine (v8). Rules only: no trained text model, no network.
    Evidence sources (see the page's "research" section):
    - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
    - Reinhart et al., PNAS 2025 (participial clauses etc.)
@@ -516,6 +516,27 @@ function slidingWindow(text, size = 90) {
   return { sentences: sent, max: Math.max(...wins.map(w => w.score)), min: Math.min(...wins.map(w => w.score)) };
 }
 
+// Mixed-text check: does one paragraph stand out as much more AI-like than the rest?
+// v8: the old rule (any ~90-word window ≥70 plus one ≤35) labelled 76 of 2,046 real human texts "Mixed",
+// including 12% of student essays. Now one paragraph (not the last, since conclusions naturally sound
+// like summaries) must score 70+ AND be 40+ points above the median of the other paragraphs.
+// Real humans labelled mixed: 5 of 2,046. Real essays with a pasted ChatGPT/Claude paragraph: 22 of 193.
+const MIXED_RULE = { para: 70, gap: 40, minParaWords: 40 };
+function mixedCheck(text, r) {
+  const none = { mixed: false };
+  if (r.tooShort || r.band === "ai") return none;
+  const paras = []; let from = 0;
+  for (const p of paraSplit(text)) { const at = text.indexOf(p, from); if (at < 0) continue; from = at + p.length; if (nWords(p) >= MIXED_RULE.minParaWords) paras.push({ start: at, end: at + p.length, score: analyze(p).score }); }
+  if (paras.length < 3) return none;
+  let best = null;
+  for (let i = 0; i < paras.length - 1; i++) {
+    const others = paras.filter((_, j) => j !== i).map(p => p.score).sort((a, b) => a - b);
+    const median = others[Math.floor(others.length / 2)];
+    if (paras[i].score >= MIXED_RULE.para && paras[i].score - median >= MIXED_RULE.gap && (!best || paras[i].score > best.score)) best = Object.assign({ median }, paras[i]);
+  }
+  return best ? { mixed: true, para: best } : none;
+}
+
 // ---------- 8. Fairness cautions ----------
 function cautions(r) {
   const c = r.counts, out = [];
@@ -583,4 +604,4 @@ function compareStyles(known, unknown) {
   return { delta, level, diffs, nA: A.n, nB: B.n };
 }
 // ==/CORE==
-if (typeof module !== "undefined") module.exports = { suspect, compareStyles, englishCoverage, cleanText, features, analyze, scoreFeatures, MODEL, BANDS, attribute, segments, slidingWindow, cautions, nWords };
+if (typeof module !== "undefined") module.exports = { mixedCheck, MIXED_RULE, suspect, compareStyles, englishCoverage, cleanText, features, analyze, scoreFeatures, MODEL, BANDS, attribute, segments, slidingWindow, cautions, nWords };

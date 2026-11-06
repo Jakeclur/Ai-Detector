@@ -35,7 +35,8 @@ This file gives a Claude Code session the full context of how this project was b
 - **Edited-AI check** (`edited` in `counts`, 0/1/2, plus `edHumanEv` / `edSkelEv`): casual touches (casual words, dropped apostrophes, personal story) vs leftover AI skeleton (enumerated causes/stages, "that's why", good-side/bad-side or decision-rule framing, textbook definition opener, shape habit, AI words/phrases). Skipped for narratives (3+ "I/we/he/she was/had/said…"). Level 2 = 2+ of each → `analyze` sets band `edited` and score max(score, 45); `rawScore` keeps the original. Level 1 = a note only. Never pushes to ≥55 (hard requirement 6). `suspect` returns "Possibly AI that a person has edited".
 - `paraSplit(text)`: blank-line paragraphs, or single lines when there are no blank lines (used by the shape clue; the evenness clue still uses blank-line paragraphs only, because switching it flagged one more human).
 - `segments(text)`: paragraph sections (or ~110-word sentence runs), each scored with `analyze`.
-- `slidingWindow(text)`: ~90-word half-overlapping windows scored with `noShrink`. Each sentence gets the average of the windows covering it. The UI shades sentences ≥65. The page sets band `mixed` if window max ≥70 and min ≤35 (or section hi ≥65 and lo ≤35) and the band isn't already `ai`.
+- `mixedCheck(text, r)` (v8): band `mixed` when one paragraph (via `paraSplit`, ≥40 words, not the last) scores ≥70 alone and ≥40 above the median of the others (`MIXED_RULE`), and the band isn't `ai`. The UI shades that paragraph. Replaced the old window rule, which labelled 76/2,056 real humans (12% of student essays) "Mixed"; new rule 6/2,262 humans, 24/193 real essays with a pasted real ChatGPT/Claude paragraph (old 49).
+- `slidingWindow(text)`: ~90-word half-overlapping windows scored with `noShrink`. Kept for tests; the page no longer uses it (single windows were too jumpy).
 - `cautions(r)`: fairness notes.
 - `compareStyles(known, unknown)`: Burrows' Delta over ~70 function words (means and SDs in `FW_STATS`, measured on the human corpus) plus plain-English style differences. Level: similar / somewhat different / very different.
 - `englishCoverage(text)`: share of common English function words. Under 20 → "doesn't look like English".
@@ -71,6 +72,10 @@ This file gives a Claude Code session the full context of how this project was b
 ## v7 results (edited-AI check)
 - Edited Opus 5.5: 6/15 → band `edited` (2/8 tune, 4/7 hold-out; the hold-out was looked at while designing, so it's optimistic). Humans: 1/2,281 → `edited` (other/ets/175), 6 more get level 1 (note only). Humans flagged ≥55 unchanged.
 - Limits: edited stories and essays are rarely caught. Real casual human school answers are missing from the test data, so false alarms on teens may be higher than measured.
+
+## v8 (Mixed-rule fix)
+- The owner supplied their own Year 10 English essay (To Kill a Mockingbird, 807 words incl. their notes). Score 28 human-leaning, but the old Mixed rule fired (window max 77 on the conclusion: "In conclusion", 3 trailing -ing clauses). Not committed (it's the owner's own school work and the repo is public).
+- Measuring "Mixed" on real humans for the first time showed 76/2,056. Fixed with `mixedCheck` (above). Demo mixed sample's AI paragraph got "Moreover," so it still demonstrates Mixed (75 vs ~21).
 
 ## Decisions and rejected ideas
 - **v5 fairness fixes (from real learner essays):** "I hope this helps" is a stock phrase, not a certain giveaway (a Reddit writer used it); "I think" doesn't count as casual for the too-clean rule; the hopeful-ending clue needs dialogue or fiction clichés; lists of -ing words aren't trailing clauses; each AI word counts at most twice and tier-1 everyday words count half; "Copy code" only counts on its own line.

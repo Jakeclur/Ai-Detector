@@ -192,7 +192,7 @@
           <span style="--c:var(--hl-phrase)">stock phrase / cliché</span>
           <span style="--c:var(--hl-struct)">sentence pattern / formatting</span>
           <span style="--c:var(--hl-trans)">formal transition</span>
-          <span style="--c:var(--tint)">part of an AI-like stretch</span>
+          <span style="--c:var(--tint)">paragraph that stands out</span>
         </div>
       </div>
     </section>
@@ -280,7 +280,7 @@ a Claude answer goes here…</pre>
     <p><b>Own test set</b> (newer chatbot styles, all written by Claude): 0 of 216 human passages flagged; AI caught: classic ChatGPT-style essays 100%, modern answers about 33%, stories about 25%, emails about 13%, AI told to sound like a teenager about 10%. Any text with leftover chatbot lines ("As an AI language model", "[Your Name]", citation codes) is nearly always caught.</p>
     <p><b>Big caveat:</b> the real chatbot text is from 2023 models, which write differently from today's. The newer-style samples were all written by one AI (Claude), and the "ChatGPT-style" ones are imitations. Use the Test lab with your own real examples to find out how it does for you.</p>
     <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. On real 2023 Claude essays it sometimes said "ChatGPT-leaning" and never "Claude-leaning", because its Claude clues come from 2026 Claude versions. Treat it as a hint.</p>
-    <p><b>Mixed texts:</b> in a test essay made of three human paragraphs and one pasted AI paragraph, the whole essay scored 22 and was labelled "Mixed", while the AI paragraph's section scored 68 and the sliding window reached 71.</p>
+    <p><b>Mixed texts:</b> "Mixed" means one paragraph (not the last one) scores 70+ on its own and at least 40 points above the other paragraphs. A real student's essay showed that the old rule was far too jumpy: it would have labelled 76 of 2,056 real human texts "Mixed", including 12% of student essays. The new rule labels 6 of 2,262. On 193 real student essays with one real ChatGPT or Claude paragraph pasted in, it spots the pasted paragraph 24 times, so it misses most pasted paragraphs that aren't strongly AI-like.</p>
     <p>Tools that run a real language model do much better. Pangram reports catching 99.7% of Claude Opus 5.5 answers. A page like this can't run such a model, and I haven't added one because I couldn't test it here.</p>
   </details>
 
@@ -310,7 +310,7 @@ a Claude answer goes here…</pre>
 <script>
 // ==CORE==
 /* =====================================================================
-   AI Text Detector engine (v7). Rules only: no trained text model, no network.
+   AI Text Detector engine (v8). Rules only: no trained text model, no network.
    Evidence sources (see the page's "research" section):
    - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
    - Reinhart et al., PNAS 2025 (participial clauses etc.)
@@ -826,6 +826,27 @@ function slidingWindow(text, size = 90) {
   return { sentences: sent, max: Math.max(...wins.map(w => w.score)), min: Math.min(...wins.map(w => w.score)) };
 }
 
+// Mixed-text check: does one paragraph stand out as much more AI-like than the rest?
+// v8: the old rule (any ~90-word window ≥70 plus one ≤35) labelled 76 of 2,046 real human texts "Mixed",
+// including 12% of student essays. Now one paragraph (not the last, since conclusions naturally sound
+// like summaries) must score 70+ AND be 40+ points above the median of the other paragraphs.
+// Real humans labelled mixed: 5 of 2,046. Real essays with a pasted ChatGPT/Claude paragraph: 22 of 193.
+const MIXED_RULE = { para: 70, gap: 40, minParaWords: 40 };
+function mixedCheck(text, r) {
+  const none = { mixed: false };
+  if (r.tooShort || r.band === "ai") return none;
+  const paras = []; let from = 0;
+  for (const p of paraSplit(text)) { const at = text.indexOf(p, from); if (at < 0) continue; from = at + p.length; if (nWords(p) >= MIXED_RULE.minParaWords) paras.push({ start: at, end: at + p.length, score: analyze(p).score }); }
+  if (paras.length < 3) return none;
+  let best = null;
+  for (let i = 0; i < paras.length - 1; i++) {
+    const others = paras.filter((_, j) => j !== i).map(p => p.score).sort((a, b) => a - b);
+    const median = others[Math.floor(others.length / 2)];
+    if (paras[i].score >= MIXED_RULE.para && paras[i].score - median >= MIXED_RULE.gap && (!best || paras[i].score > best.score)) best = Object.assign({ median }, paras[i]);
+  }
+  return best ? { mixed: true, para: best } : none;
+}
+
 // ---------- 8. Fairness cautions ----------
 function cautions(r) {
   const c = r.counts, out = [];
@@ -910,7 +931,7 @@ if (typeof document !== "undefined") {
     chatgpt: labBlocks[6].split("\n").slice(1).join("\n"),
     opus: "Compound interest means you earn interest on your interest, not just on the money you started with.\n\nSay you put $1,000 in a savings account that pays 5% a year. After one year you have $1,050. In the second year, the 5% is worked out on $1,050, not $1,000, so you earn $52.50 instead of $50. The gap looks tiny at first, but it keeps growing because every year's interest becomes part of the base for the next year.\n\nAfter 10 years, simple interest would give you $1,500. Compound interest gives you about $1,629. After 30 years it's $2,500 versus roughly $4,322.\n\nThree things control how fast it grows:\n\n1. The interest rate. A higher rate compounds much faster.\n2. Time. This is the big one. Most of the growth happens in the later years.\n3. How often interest is added. Monthly compounding beats yearly compounding slightly.\n\nThe same maths works against you with debt. Credit card balances compound too, which is why a small unpaid balance can turn into a big one.\n\nA handy shortcut is the rule of 72: divide 72 by the interest rate to estimate how many years it takes to double your money. At 6%, that's about 12 years.",
     classic: "Social media has become an integral part of modern life, fundamentally reshaping the way people communicate and connect. Moreover, it plays a crucial role in fostering a sense of community among diverse groups, enabling individuals to share experiences across borders. However, it is important to note that excessive use can have significant effects on mental health, particularly among young people. Furthermore, the rapid spread of misinformation presents a multifaceted challenge for society, underscoring the need for robust digital literacy. Additionally, privacy concerns continue to shape the ongoing debate about regulation. Ultimately, navigating the complexities of the digital landscape requires a balanced approach. In conclusion, while social media offers numerous benefits, it is essential to harness its potential responsibly and thoughtfully.",
-    mixed: [H_JEROME, H_THOREAU, A_IND, "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this."].join("\n\n"),
+    mixed: [H_JEROME, H_THOREAU, A_IND.replace("These changes brought about", "Moreover, these changes brought about"), "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this."].join("\n\n"),
     human: H_JEROME
   };
 
@@ -964,12 +985,11 @@ if (typeof document !== "undefined") {
     if (r.tooShort) return { tooShort: true, wc: r.wc };
     r.text = text; r.cleanNotes = cl.notes;
     r.attr = attribute(text, r);
-    r.win = slidingWindow(text);
     r.segs = segments(text).filter(s => s.score != null);
+    r.mix = mixedCheck(text, r);
     r.cautions = cautions(r);
     if (r.f.tooClean) r.cautions.push("This text sounds casual but is unusually tidy (no slips, even rhythm, neat ending). Some careful human writers write like this, so don't read much into that clue alone.");
-    if (r.win && r.win.max >= 70 && r.win.min <= 35 && r.band !== "ai") r.band = "mixed";
-    if (r.segs.length >= 2) { const hi = Math.max(...r.segs.map(s => s.score)), lo = Math.min(...r.segs.map(s => s.score)); if (hi >= 65 && lo <= 35 && r.band !== "ai") r.band = "mixed"; }
+    if (r.mix.mixed) r.band = "mixed";
     r.english = englishCoverage(text);
     r.suspect = suspect(text, r, r.attr);
     return r;
@@ -978,7 +998,7 @@ if (typeof document !== "undefined") {
     human: ["Human-leaning", "human", "Few known AI habits. AI text written in a plain or casual style can still score this low, so this isn't proof a person wrote it."],
     inconclusive: ["Inconclusive", "mixed", "Not enough evidence either way. Plenty of human writing and plenty of lightly edited AI writing land here."],
     edited: ["Inconclusive: possibly edited AI", "mixed", "Few obvious AI habits, but casual touches sit on top of an AI-style explanation skeleton, which is what AI text looks like after someone edits it. People writing casually can look like this too. See the edited-AI check below."],
-    mixed: ["Mixed: part of it stands out", "mixed", "Most of the text looks human-leaning, but at least one stretch shows many AI habits. See the section scan and the shaded sentences below."],
+    mixed: ["Mixed: part of it stands out", "mixed", "Most of the text looks human-leaning, but one paragraph shows far more AI habits than the rest. It's shaded in the flagged text below. People's writing varies too, so this is a reason to look closer, not proof."],
     ai: ["AI-leaning", "ai", "Many habits that chatbots overuse. That's a reason to look closer, not proof."]
   };
 
@@ -1042,8 +1062,8 @@ if (typeof document !== "undefined") {
 
   function renderMarked(r) {
     const text = r.text;
-    const tints = r.win ? r.win.sentences.filter(s => s.score != null && s.score >= 65).map(s => [s.start, s.end]) : [];
-    $("tintNote").textContent = tints.length ? "Shaded sentences sit in a stretch that scored 65+ on its own." : "";
+    const tints = r.mix.mixed ? [[r.mix.para.start, r.mix.para.end]] : [];
+    $("tintNote").textContent = tints.length ? `The shaded paragraph scored ${r.mix.para.score} on its own, while the other paragraphs scored around ${r.mix.para.median}.` : "";
     const cuts = new Set([0, text.length]);
     r.hits.forEach(h => { cuts.add(h.start); cuts.add(h.end); });
     tints.forEach(([a, b]) => { cuts.add(a); cuts.add(b); });
@@ -1125,7 +1145,7 @@ if (typeof document !== "undefined") {
       $("strip").innerHTML = segs.map((s, i) => `<div title="Section ${i + 1}: ${s.score}" style="flex:${(s.end - s.start) / total};background:var(--${toneOf(s.score)})">${s.score}</div>`).join("");
       $("segs").innerHTML = segs.map((s, i) => `<div class="seg"><div class="badge" style="background:var(--${toneOf(s.score)})">${s.score}</div><div><b>Section ${i + 1}</b> · ${plural(nWords(r.text.slice(s.start, s.end)), "word")}<div class="note">${escH(r.text.slice(s.start, s.end).trim().slice(0, 140))}…</div></div></div>`).join("");
       const hi = Math.max(...segs.map(s => s.score)), lo = Math.min(...segs.map(s => s.score));
-      if (hi >= 60 && hi - lo >= 30) $("segs").insertAdjacentHTML("afterbegin", `<p style="margin:0 0 8px;font-size:.92rem"><b>One part stands out:</b> it scores ${hi}, while the lowest-scoring part scores ${lo}. That's worth a closer look.</p>`);
+      if (r.mix.mixed) $("segs").insertAdjacentHTML("afterbegin", `<p style="margin:0 0 8px;font-size:.92rem"><b>One paragraph stands out:</b> it scores ${r.mix.para.score}, while the other paragraphs score around ${r.mix.para.median}. That's worth a closer look.</p>`);
     }
 
     renderMarked(r);
