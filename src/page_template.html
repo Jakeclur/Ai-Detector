@@ -493,7 +493,8 @@ if (typeof document !== "undefined") {
     pr_we: "we / us / our", pr_you: "you / your", pr_3: "he / she / they", digits: "numbers", caps: "names and capitalised words",
     tmpl_rep: "sentences that start the same way", parallel: "back-to-back sentences built the same way", open_rep: "paragraphs that open the same way",
     discourse: "sentences opening with linking words (however, also, for example)", ov_mean: "word overlap between neighbouring sentences",
-    ov_sd: "variation in that overlap", intro_concl: "the ending repeating the opening", tri_rep: "repeated three-word phrases"
+    ov_sd: "variation in that overlap", intro_concl: "the ending repeating the opening", tri_rep: "repeated three-word phrases",
+    _chr: "letter and punctuation patterns (512 small patterns combined)"
   };
   const PUNCT = { ",": "commas", ".": "full stops", ";": "semicolons", ":": "colons", "!": "exclamation marks", "?": "question marks", "(": "brackets", ")": "closing brackets", '"': "quotation marks", "—": "em dashes", "–": "en dashes" };
   function modelNotes(r) {
@@ -511,7 +512,7 @@ if (typeof document !== "undefined") {
     return rows.map(([name, c, z]) => {
       const w = Math.min(50, Math.abs(c) / max * 50);
       const style = c > 0 ? `left:50%;width:${w}%;background:var(--ai)` : `right:50%;width:${w}%;background:var(--human)`;
-      return `<div class="mnote"><div><b>${escH(nice(name))}</b>: ${z > 0 ? "more" : "less"} than typical<div class="note">${c > 0 ? "Pushes towards AI" : "Pushes towards human"}.</div></div><div class="push"><i style="${style}"></i></div></div>`;
+      return `<div class="mnote"><div><b>${escH(nice(name))}</b>${name === "style:_chr" ? "" : `: ${z > 0 ? "more" : "less"} than typical`}<div class="note">${c > 0 ? "Pushes towards AI" : "Pushes towards human"}.</div></div><div class="push"><i style="${style}"></i></div></div>`;
     }).join("") + `<div class="push-lbl"><span>human</span><span>AI</span></div>`;
   }
 

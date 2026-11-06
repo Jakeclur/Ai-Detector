@@ -23,6 +23,7 @@ function modelVector(M, R, sf) {
   const n = Math.max(1, sf.n);
   for (const t of M.vocab) v[i++] = Math.sqrt((sf.tok.get(t) || 0) / n * 100);
   for (const t of (M.classVocab || [])) v[i++] = Math.sqrt((sf.cls.get(t) || 0) / n * 100);
+  if (M.useChr) for (let k = 0; k < 512; k++) v[i++] = sf.chr[k];   // v12: hashed character 3-grams
   for (let j = 0; j < v.length; j++) v[j] = (v[j] - M.mu[j]) / M.sd[j];
   return v;
 }
@@ -61,9 +62,11 @@ function modelScore(text, R, sf) {
   } else { z = zLin * lf; zsd = sdLin * lf; }
   const cal = x => 1 / (1 + Math.exp(-(M.calibration.a * x + M.calibration.c)));
   // contribution of each feature family (mean member weights x standardised value), for the explanation
-  const fam = { rules: 0, style: 0, words: 0 }, top = [];
+  const fam = { rules: 0, style: 0, words: 0 }, top = []; let chrSum = 0;
   const w = M.features.map((_, j) => M.members.reduce((a, m) => a + m.w[j], 0) / M.members.length);
-  M.features.forEach((name, j) => { const c = w[j] * v[j]; fam[name.startsWith("rule:") ? "rules" : name.startsWith("style:") || name.startsWith("cls:") ? "style" : "words"] += c; top.push([name, c, v[j]]); });
+  M.features.forEach((name, j) => { const c = w[j] * v[j]; fam[name.startsWith("rule:") ? "rules" : name.startsWith("style:") || name.startsWith("cls:") || name.startsWith("chr:") ? "style" : "words"] += c; if (name.startsWith("chr:")) chrSum += c; else top.push([name, c, v[j]]); });
+  // the 512 hashed character patterns have no readable names: shown as one combined row
+  if (chrSum) top.push(["style:_chr", chrSum, chrSum]);
   top.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   // out-of-distribution: how many features sit well outside anything seen in training
   let outside = 0; for (let j = 0; j < v.length; j++) { const span = M.range.hi[j] - M.range.lo[j] || 1; if (v[j] > M.range.hi[j] + 0.25 * span || v[j] < M.range.lo[j] - 0.25 * span) outside++; }

@@ -223,7 +223,7 @@ function toJSON(M) {
   const r = a => Array.from(a, v => +v.toFixed(5));
   return {
     version: 10, trained: new Date().toISOString().slice(0, 10),
-    features: M.spec.names, ruleKeys: M.spec.useRules ? RULE_KEYS : [], styleKeys: M.spec.useStyle ? M.spec.styleKeys : [], vocab: M.spec.vocab, classVocab: M.spec.classVocab || [],
+    features: M.spec.names, ruleKeys: M.spec.useRules ? RULE_KEYS : [], styleKeys: M.spec.useStyle ? M.spec.styleKeys : [], vocab: M.spec.vocab, classVocab: M.spec.classVocab || [], useChr: !!M.spec.useChr,
     mu: r(M.mu), sd: r(M.sd), members: M.members.map(m => ({ b: +m.b.toFixed(5), w: r(m.beta) })),
     calibration: { a: +M.cal.a.toFixed(5), c: +M.cal.c.toFixed(5) },
     cutoffs: { human: +M.cut.lo.toFixed(4), ai: +M.cut.hi.toFixed(4), genre: Object.fromEntries(Object.entries(M.cut.genre).map(([k, v]) => [k, +v.toFixed(4)])),
@@ -247,7 +247,9 @@ if (require.main === module) {
   // cut-offs at the 99.8th / 99.9th percentile of out-of-fold human scores: by construction about 0.1-0.2% of real
   // people score above them. (A 99.3rd-percentile cut-off looked good on one held-out run but flagged 0.7% of humans
   // after retraining, as its percentile implies, so it was rejected.)
-  const M = trainAll(rows, { useRules: true, useStyle: true, useVocab: true, modernWeight: 8, humanWeight: 2 }, { l2: 0.01, gbdt: true, hiPct: 0.998, genrePct: 0.999 });
+  // v12: + hashed character 3-grams (useChr). At zero held-out false positives they raised recall 81.9% -> 85.6%
+  // (humaniser text 46% -> 67%, Claude 2023 54% -> 64%, paraphrased 64% -> 70%).
+  const M = trainAll(rows, { useRules: true, useStyle: true, useVocab: true, useChr: true, modernWeight: 8, humanWeight: 2 }, { l2: 0.01, gbdt: true, hiPct: 0.998, genrePct: 0.999 });
   const json = toJSON(M);
   // 2) specialist for recent Claude: Opus 5.5 texts vs all human texts, with a stricter cut-off.
   //    The general model is dominated by 2023 writing; this one only looks for what separates modern Claude.
