@@ -53,7 +53,8 @@ function scoreDocs() {
     if (C.nWords(text) < 40) continue;
     const v9 = C.analyze(text);
     const v10 = ENS.assess(d.text, { noCache: true });
-    rows.push({ y: d.label === "ai" ? 1 : 0, d,
+    const fam = /claude/.test(d.model) ? "claude" : /gpt|chatgpt/.test(d.model) ? "chatgpt" : null;
+    rows.push({ y: d.label === "ai" ? 1 : 0, d, fam, attr9: C.attribute(text, v9).lean, attr10: v10.attr ? v10.attr.lean : "unclear",
       v9: { score: v9.score, band: v9.band, flag: v9.score >= C.BANDS.ai || v9.band === "ai" },
       v10: { score: v10.likelihood, band: v10.band, flag: v10.band === "ai", genre: v10.genre, conf: v10.confidence } });
   }
@@ -122,6 +123,16 @@ function main() {
   const mixed = mixedDocs(); let m9 = 0, m10 = 0, h9 = 0, h10 = 0;
   for (const m of mixed) { const a = mixedResult(m.mixed), b = mixedResult(m.human); if (a.v9) m9++; if (a.v10) m10++; if (b.v9) h9++; if (b.v10) h10++; }
   report.mixed = { n: mixed.length, flagged_v9: m9, flagged_v10: m10, same_essay_without_ai_paragraph_v9: h9, same_essay_without_ai_paragraph_v10: h10 };
+  // attribution: which family (Claude vs ChatGPT) on AI texts with a known family
+  const at = {};
+  // only texts the system didn't call "likely human" (it doesn't name a model for those)
+  for (const r of rows.filter(r => r.y && r.fam && !r.d.condition.includes("@") && r.v10.band !== "human")) {
+    const k = r.d.model + (r.d.condition === "original" ? "" : " (" + r.d.condition + ")");
+    const o = at[k] = at[k] || { family: r.fam, n: 0, v9: { right: 0, wrong: 0, unclear: 0 }, v10: { right: 0, wrong: 0, unclear: 0 } };
+    o.n++;
+    for (const [sys, lean] of [["v9", r.attr9], ["v10", r.attr10]]) o[sys][lean === "unclear" ? "unclear" : lean === r.fam ? "right" : "wrong"]++;
+  }
+  report.attribution = at;
   report.seconds = Math.round((Date.now() - t0) / 1000);
   const dir = path.join(__dirname, "../docs"); fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "benchmark.json"), JSON.stringify(report, null, 1));
@@ -133,6 +144,7 @@ function main() {
   for (const s of report.slices) console.log(`${s.name.slice(0, 62).padEnd(62)} v9 rec ${f(s.v9.recall).padStart(6)} FPR ${f(s.v9.fpr, 2).padStart(6)} AUC ${a(s.v9.roc_auc)} | v10 rec ${f(s.v10.recall).padStart(6)} FPR ${f(s.v10.fpr, 2).padStart(6)} AUC ${a(s.v10.roc_auc)}`);
   console.log("human false positives by source:", Object.entries(bySrc).map(([k, v]) => `${k.replace("ghostbuster/", "")} ${v.v9}→${v.v10}/${v.n}`).join(", "));
   console.log("mixed:", report.mixed);
+  for (const [k, o] of Object.entries(at)) console.log(`attribution ${k.padEnd(40)} n ${String(o.n).padStart(5)} | v9 right ${f(o.v9.right / o.n)} wrong ${f(o.v9.wrong / o.n)} | v11 right ${f(o.v10.right / o.n)} wrong ${f(o.v10.wrong / o.n)}`);
 }
 
 function html(R) {
@@ -155,8 +167,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}td:first-child{white-space:normal;min-width:240px}
 th{color:var(--muted);font-weight:600}.n{text-align:right;font-variant-numeric:tabular-nums}.up{color:var(--up);font-weight:700}.down{color:var(--down);font-weight:700}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.kpi b{display:block;font-size:1.6rem}.muted{color:var(--muted)}</style></head><body><main>
-<h1>Detector benchmark: v9 rules vs v10 ensemble</h1>
-<p class="muted">Held-out test split only (${R.docs.toLocaleString()} documents; ${R.skippedLeaks} near-copies of training documents skipped). Generated ${R.generated.slice(0, 10)}. "Recall" = share of AI texts flagged AI-leaning; "FPR" = share of human texts wrongly flagged. AUC is threshold-free (1.0 perfect, 0.5 coin toss). Green = better than v9.</p>
+<h1>Detector benchmark: v9 rules vs v11 ensemble</h1>
+<p class="muted">Held-out test split only (${R.docs.toLocaleString()} documents; ${R.skippedLeaks} near-copies of training documents skipped). Generated ${R.generated.slice(0, 10)}. "Recall" = share of AI texts flagged AI-leaning; "FPR" = share of human texts wrongly flagged. AUC is threshold-free (1.0 perfect, 0.5 coin toss). Green = better than v9. Columns labelled v10 show the current engine (v11).</p>
 <div class="card kpis">
 <div class="kpi"><span class="muted">AI caught (overall)</span><b>${f(O.v9.recall)} → ${f(O.v10.recall)}</b></div>
 <div class="kpi"><span class="muted">Humans wrongly flagged</span><b>${f(O.v9.fpr, 2)} → ${f(O.v10.fpr, 2)}</b></div>
@@ -167,6 +179,9 @@ th{color:var(--muted);font-weight:600}.n{text-align:right;font-variant-numeric:t
 ${row("<b>Overall</b> (original, prompt variants, humaniser)", O)}${R.slices.map(s => row(s.name, s)).join("")}</table></div>
 <div class="card"><h2>Human false positives by source</h2><div class="wrap"><table><tr><th>Source</th><th class="n">Texts</th><th class="n">v9 flagged</th><th class="n">v10 flagged</th></tr>
 ${Object.entries(R.humanFalsePositives).map(([k, v]) => `<tr><td>${k}</td><td class="n">${v.n}</td><td class="n">${v.v9}</td><td class="n ${cls(v.v10, v.v9, true)}">${v.v10}</td></tr>`).join("")}</table></div></div>
+<div class="card"><h2>Which AI? (Claude vs ChatGPT attribution)</h2><div class="wrap"><table><tr><th>AI texts</th><th class="n">Texts</th><th class="n">Right v9</th><th class="n">v11</th><th class="n">Wrong v9</th><th class="n">v11</th><th class="n">Can't tell v9</th><th class="n">v11</th></tr>
+${Object.entries(R.attribution || {}).map(([k, o]) => `<tr><td>${k}</td><td class="n">${o.n}</td><td class="n">${f(o.v9.right / o.n)}</td><td class="n ${cls(o.v10.right / o.n, o.v9.right / o.n)}">${f(o.v10.right / o.n)}</td><td class="n">${f(o.v9.wrong / o.n)}</td><td class="n ${cls(o.v10.wrong / o.n, o.v9.wrong / o.n, true)}">${f(o.v10.wrong / o.n)}</td><td class="n">${f(o.v9.unclear / o.n)}</td><td class="n">${f(o.v10.unclear / o.n)}</td></tr>`).join("")}</table></div>
+<p class="muted">Counted on AI texts that v11 did not call "likely human" (it doesn't name a model for those). "chatgpt-imitation" texts were written by Claude imitating ChatGPT, so "Claude" is arguably the right answer for them.</p></div>
 <div class="card"><h2>Mixed-origin essays</h2><p>${R.mixed.n} held-out student essays with one AI paragraph (same prompt) pasted into the middle. Flagged as Mixed or AI-leaning: v9 ${R.mixed.flagged_v9}, v10 ${R.mixed.flagged_v10}. The same essays without the AI paragraph: v9 ${R.mixed.same_essay_without_ai_paragraph_v9}, v10 ${R.mixed.same_essay_without_ai_paragraph_v10}.</p></div>
 <p class="muted">Limits: AI texts are mostly gpt-3.5-turbo and Claude (2023); contemporary coverage is 54 Claude Opus 5.5 texts. No GPT-5/6, Gemini, DeepSeek or Llama samples were available. Edited-text conditions are Ghostbuster's automatic perturbations of news articles.</p>
 </main></body></html>`;

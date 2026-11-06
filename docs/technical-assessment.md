@@ -110,3 +110,23 @@ Held-out test split: 2,339 human and 6,413 AI texts; 610 near-copies of training
 - **Mixed essays:** about 3% spotted.
 
 These need more and better modern data, especially real outputs from current models and real human-edited AI text. The import folder is ready for it.
+
+## 6. v11 follow-up
+
+**Changes:**
+- Gradient-boosted trees blended with the logistic ensemble.
+- A trained attribution model (Claude vs ChatGPT).
+- A humaniser specialist.
+- A minimum-support rule for specialists.
+- "Likely human" below 50.
+- Version hints from the recent-Claude model.
+- 40 more Opus 5.5 samples.
+
+**Results:**
+- Held-out humans flagged went 3 → 2, and recall went 82.0% → 83.3%.
+- On the larger Opus 5.5 test set (39 texts): 36% detected and 40% of edited Opus.
+- Attribution, when a model is named, is right 88–99% of the time (old clue-based attribution: 2–28%).
+
+**Lessons:**
+- Choosing a cut-off percentile from held-out false-positive counts is unreliable. A 99.3rd-percentile cut-off flagged 1 human in one run and 17 after retraining. Cut-offs are now set only from the intended percentile.
+- Most remaining recent-Claude misses get 90–99 from the main model, but fall in the "other" genre, whose cut-off is held up by three ordinary human texts. Better genre recognition, or more modern human and AI data, is the way forward. Loosening the cut-off would flag real people.

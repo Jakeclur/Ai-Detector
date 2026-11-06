@@ -59,3 +59,11 @@ extra_tune.txt: 1–5 short stories (an inherited island house, a town power out
 extra_holdout.txt: 1–3 short stories (a reopened bakery, a ghost ship at a lighthouse, a grandmother who notices); 4–5 news reports (Melbourne contactless fares, loggerhead turtle nests); 6–7 essays (the Eureka Stockade, social media and young people); 8 email (quitting a basketball team); 9 explanation (mortgage offset accounts); 10 excursion reflection.
 
 Names, places, organisations and figures in these passages are invented for the writing tasks (the news reports are fictional).
+
+## Third batch (v11): batch3_tune.txt (25) and batch3_holdout.txt (15)
+
+Same session, same caveat. batch3_tune.txt: 1–5 short stories (a boy who carries his sister's ukulele, a forbidden jetty, a retired nurse, a 3am message from a runaway brother, a strict piano teacher); 6–8 news reports (unit pricing rules, a school solar battery, whales off Sydney); 9–11 essays (Industrial Revolution living standards, Boxer in Animal Farm, a republic); 12–15 messages (a casual weekend plan, an apology to a teacher, a sports club notice, a road-safety letter to a councillor); 16 explanation (inflation and the RBA); 17 how-to (topic sentences); 18 excursion report; 19 graduation speech; 20 game review; 21 casual post about rowing; 22 explanation (leap years); 23 pros and cons (four-day school week); 24 work-experience reflection; 25 group project meeting notes.
+
+batch3_holdout.txt: 1–3 short stories (snow and a grandfather's hat, a letter from your 8-year-old self, a night in hospital); 4–5 news reports (Gold Coast light rail, a new Kimberley gecko); 6–7 essays (Romeo and Juliet, primary school homework); 8 casual email declining a party; 9 explanation (herd immunity); 10 drama reflection; 11 explanation (why the sea is salty); 12 casual post about a group project; 13 parent email to a teacher; 14 explanation (thunderstorms); 15 book review (Holes).
+
+Names, figures and news events in these passages are invented for the writing tasks.

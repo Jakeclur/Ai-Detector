@@ -12,7 +12,8 @@ function scoreWith(M, R, sf, wc) {
   const zs = M.members.map(m => { let z = m.b; for (let j = 0; j < v.length; j++) z += m.w[j] * v[j]; return z; });
   const L = M.length || { min: 0.3, full: 300 };
   const lf = Math.max(L.min, Math.min(1, (wc - 40) / (L.full - 40)));
-  const z = zs.reduce((a, b) => a + b, 0) / zs.length * lf;
+  const zl = zs.reduce((a, b) => a + b, 0) / zs.length;
+  const z = (M.gbdt ? (zl + gbdtLogit(M.gbdt, v)) / 2 : zl) * lf;
   return 1 / (1 + Math.exp(-(M.calibration.a * z + M.calibration.c)));
 }
 function modelVector(M, R, sf) {
@@ -21,10 +22,17 @@ function modelVector(M, R, sf) {
   for (const k of M.styleKeys) v[i++] = sf.f[k];
   const n = Math.max(1, sf.n);
   for (const t of M.vocab) v[i++] = Math.sqrt((sf.tok.get(t) || 0) / n * 100);
+  for (const t of (M.classVocab || [])) v[i++] = Math.sqrt((sf.cls.get(t) || 0) / n * 100);
   for (let j = 0; j < v.length; j++) v[j] = (v[j] - M.mu[j]) / M.sd[j];
   return v;
 }
 
+// boosted trees (packed: [leaf] or [feature, threshold, left, right])
+function gbdtLogit(G, v) {
+  let z = G.base;
+  for (const t of G.trees) { let k = 0; for (;;) { const nd = t[k]; if (nd.length === 1) { z += nd[0]; break; } k = v[nd[0]] <= nd[1] ? nd[2] : nd[3]; } }
+  return z;
+}
 // Score a text with the trained model. Returns null when no model is loaded.
 function modelScore(text, R, sf) {
   const M = typeof DETECTOR_MODEL !== "undefined" ? DETECTOR_MODEL : null;
@@ -34,18 +42,25 @@ function modelScore(text, R, sf) {
   // short texts carry less evidence: shrink towards 0 (same rule as in training)
   const L = M.length || { min: 0.3, full: 300 }, wc = nWords(text);
   const lf = Math.max(L.min, Math.min(1, (wc - 40) / (L.full - 40)));
-  const z = zs.reduce((a, b) => a + b, 0) / zs.length * lf;
-  const zsd = Math.sqrt(zs.reduce((a, b) => a + (b * lf - z) ** 2, 0) / zs.length);
+  const zLin = zs.reduce((a, b) => a + b, 0) / zs.length;
+  const sdLin = Math.sqrt(zs.reduce((a, b) => a + (b - zLin) ** 2, 0) / zs.length);
+  let z, zsd;
+  if (M.gbdt) {
+    // v11: blend of the linear ensemble and the boosted trees; their disagreement adds to the uncertainty
+    const zG = gbdtLogit(M.gbdt, v);
+    z = (zLin + zG) / 2 * lf;
+    zsd = Math.sqrt((sdLin * lf / 2) ** 2 + ((zLin - zG) * lf / 2) ** 2);
+  } else { z = zLin * lf; zsd = sdLin * lf; }
   const cal = x => 1 / (1 + Math.exp(-(M.calibration.a * x + M.calibration.c)));
   // contribution of each feature family (mean member weights x standardised value), for the explanation
   const fam = { rules: 0, style: 0, words: 0 }, top = [];
   const w = M.features.map((_, j) => M.members.reduce((a, m) => a + m.w[j], 0) / M.members.length);
-  M.features.forEach((name, j) => { const c = w[j] * v[j]; fam[name.startsWith("rule:") ? "rules" : name.startsWith("style:") ? "style" : "words"] += c; top.push([name, c, v[j]]); });
+  M.features.forEach((name, j) => { const c = w[j] * v[j]; fam[name.startsWith("rule:") ? "rules" : name.startsWith("style:") || name.startsWith("cls:") ? "style" : "words"] += c; top.push([name, c, v[j]]); });
   top.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   // out-of-distribution: how many features sit well outside anything seen in training
   let outside = 0; for (let j = 0; j < v.length; j++) { const span = M.range.hi[j] - M.range.lo[j] || 1; if (v[j] > M.range.hi[j] + 0.25 * span || v[j] < M.range.lo[j] - 0.25 * span) outside++; }
   // specialists (e.g. recent Claude): each has its own strict cut-off
-  const spec = (M.specialists || []).map(S => ({ name: S.name, label: S.label, p: scoreWith(S, R, sf, wc), cut: S.cutoffs.ai }));
+  const spec = (M.specialists || []).map(S => ({ name: S.name, label: S.label, p: scoreWith(S, R, sf, wc), cut: S.cutoffs.ai, minGeneral: S.minGeneral || 0 }));
   return { p: cal(z), pLow: cal(z - 1.5 * zsd), pHigh: cal(z + 1.5 * zsd), z, zsd, fam, top: top.slice(0, 12), outside, cut: M.cutoffs, spec };
 }
 
@@ -84,7 +99,8 @@ function assess(raw, opts = {}) {
   if (m) {
     const g = r.genre && m.cut.genre[r.genre] != null ? r.genre : "other";
     const cutAI = m.cut.genre[g] ?? m.cut.ai;
-    const hit = m.spec.filter(s => s.p >= s.cut);
+    // a specialist only counts when the general model gives at least some support (stops extreme disagreements)
+    const hit = m.spec.filter(s => s.p >= s.cut && m.p >= s.minGeneral);
     r.specialist = hit.length ? hit[0] : null;
     const pShow = r.specialist ? Math.max(m.p, r.specialist.p) : m.p;
     r.likelihood = Math.round(pShow * 100);
@@ -127,8 +143,33 @@ function assess(raw, opts = {}) {
     r.genre && r.genre !== "other" ? "" : "The type of writing wasn't clear, so a general cut-off was used."
   ].filter(Boolean);
   r.obs = sf ? sf.obs : null;
+  // attribution: trained Claude-vs-ChatGPT model, refining the rule-based clues
+  r.attr = attribute(text, r);
+  try {
+    const AM = typeof DETECTOR_MODEL !== "undefined" && DETECTOR_MODEL ? DETECTOR_MODEL.attribution : null;
+    // the attribution model only knows Claude vs ChatGPT for AI text: skip it for human-leaning results
+    if (AM && sf && r.band !== "human") {
+      const pc = scoreWith(AM, r, sf, r.wc);
+      r.attrModel = { pClaude: pc };
+      const lean = pc >= 0.65 ? "claude" : pc <= 0.35 ? "chatgpt" : "unclear";
+      const strong = Math.abs(pc - 0.5) >= 0.4;
+      r.attr.ruleLean = r.attr.lean;
+      r.attr.lean = lean;
+      r.attr.confidence = lean === "unclear" ? "none" : strong && r.wc >= 200 ? "medium" : "low";
+      (lean === "chatgpt" ? r.attr.ev.gpt : r.attr.ev.claude).unshift(`Trained Claude-vs-ChatGPT model: ${Math.round(pc * 100)}% Claude-like (right 95-98% of the time on held-out real texts)`);
+      if (lean === "claude") r.attr.claude += 4; else if (lean === "chatgpt") r.attr.gpt += 4;
+    }
+  } catch (e) { /* keep the rule-based attribution */ }
   if (!opts.noCache) { if (ASSESS_CACHE.size > 200) ASSESS_CACHE.clear(); ASSESS_CACHE.set(key, { raw, r }); }
   return r;
+}
+
+// Claude-vs-ChatGPT probability for one piece of text (used for the stand-out paragraph of a Mixed result)
+function attributionFor(text) {
+  const AM = typeof DETECTOR_MODEL !== "undefined" && DETECTOR_MODEL ? DETECTOR_MODEL.attribution : null;
+  if (!AM) return null;
+  const R = analyze(text); if (R.tooShort) return null;
+  return scoreWith(AM, R, styleFeatures(text), R.wc);
 }
 
 // Paragraph-level view: each paragraph scored by the model on its own (short paragraphs are unreliable).
@@ -147,7 +188,7 @@ function paragraphView(text) {
 // ==/ENSEMBLE==
 if (typeof module !== "undefined") {
   const C = require("./core.js"), S = require("./stats.js");
-  Object.assign(global, { cleanText: C.cleanText, analyze: C.analyze, MODEL: C.MODEL, BANDS: C.BANDS, englishCoverage: C.englishCoverage, paraSplit: C.paraSplit, nWords: C.nWords, styleFeatures: S.styleFeatures, guessGenre: S.guessGenre });
+  Object.assign(global, { attribute: C.attribute, cleanText: C.cleanText, analyze: C.analyze, MODEL: C.MODEL, BANDS: C.BANDS, englishCoverage: C.englishCoverage, paraSplit: C.paraSplit, nWords: C.nWords, styleFeatures: S.styleFeatures, guessGenre: S.guessGenre });
   try { global.DETECTOR_MODEL = require("./model.json"); } catch (e) { /* no model: rule-engine fallback */ }
-  module.exports = { assess, modelScore, paragraphView, setModel: m => { global.DETECTOR_MODEL = m; ASSESS_CACHE.clear(); } };
+  module.exports = { attributionFor, assess, modelScore, paragraphView, setModel: m => { global.DETECTOR_MODEL = m; ASSESS_CACHE.clear(); } };
 }

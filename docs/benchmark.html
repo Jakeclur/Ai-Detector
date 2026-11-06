@@ -6,192 +6,195 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}td:first-child{white-space:normal;min-width:240px}
 th{color:var(--muted);font-weight:600}.n{text-align:right;font-variant-numeric:tabular-nums}.up{color:var(--up);font-weight:700}.down{color:var(--down);font-weight:700}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.kpi b{display:block;font-size:1.6rem}.muted{color:var(--muted)}</style></head><body><main>
-<h1>Detector benchmark: v9 rules vs v10 ensemble</h1>
-<p class="muted">Held-out test split only (10,765 documents; 610 near-copies of training documents skipped). Generated 2026-11-06. "Recall" = share of AI texts flagged AI-leaning; "FPR" = share of human texts wrongly flagged. AUC is threshold-free (1.0 perfect, 0.5 coin toss). Green = better than v9.</p>
+<h1>Detector benchmark: v9 rules vs v11 ensemble</h1>
+<p class="muted">Held-out test split only (10,780 documents; 610 near-copies of training documents skipped). Generated 2026-11-06. "Recall" = share of AI texts flagged AI-leaning; "FPR" = share of human texts wrongly flagged. AUC is threshold-free (1.0 perfect, 0.5 coin toss). Green = better than v9. Columns labelled v10 show the current engine (v11).</p>
 <div class="card kpis">
-<div class="kpi"><span class="muted">AI caught (overall)</span><b>53.3% → 82.0%</b></div>
-<div class="kpi"><span class="muted">Humans wrongly flagged</span><b>0.38% → 0.13%</b></div>
-<div class="kpi"><span class="muted">ROC-AUC</span><b>0.907 → 0.993</b></div>
-<div class="kpi"><span class="muted">Calibration error</span><b>0.152 → 0.012</b></div>
-<div class="kpi"><span class="muted">Mixed essays spotted</span><b>11 → 10 of 375</b></div></div>
+<div class="kpi"><span class="muted">AI caught (overall)</span><b>53.2% → 83.3%</b></div>
+<div class="kpi"><span class="muted">Humans wrongly flagged</span><b>0.38% → 0.09%</b></div>
+<div class="kpi"><span class="muted">ROC-AUC</span><b>0.906 → 0.995</b></div>
+<div class="kpi"><span class="muted">Calibration error</span><b>0.152 → 0.014</b></div>
+<div class="kpi"><span class="muted">Mixed essays spotted</span><b>11 → 9 of 375</b></div></div>
 <div class="card wrap"><table><tr><th>Slice</th><th class="n">Human</th><th class="n">AI</th><th class="n">Recall v9</th><th class="n">v10</th><th class="n">FPR v9</th><th class="n">v10</th><th class="n">AUC v9</th><th class="n">v10</th><th class="n">F1 v9</th><th class="n">v10</th><th class="n">PR-AUC v9</th><th class="n">v10</th><th class="n">ECE v9</th><th class="n">v10</th></tr>
-<tr><td><b>Overall</b> (original, prompt variants, humaniser)</td><td class="n">2339</td><td class="n">6413</td>
-    <td class="n">53.3%</td><td class="n up">82.0%</td>
-    <td class="n">0.38%</td><td class="n ">0.13%</td>
-    <td class="n">0.907</td><td class="n up">0.993</td>
-    <td class="n">0.695</td><td class="n up">0.901</td>
+<tr><td><b>Overall</b> (original, prompt variants, humaniser)</td><td class="n">2339</td><td class="n">6428</td>
+    <td class="n">53.2%</td><td class="n up">83.3%</td>
+    <td class="n">0.38%</td><td class="n ">0.09%</td>
+    <td class="n">0.906</td><td class="n up">0.995</td>
+    <td class="n">0.694</td><td class="n up">0.909</td>
     <td class="n">0.969</td><td class="n up">0.998</td>
-    <td class="n">0.152</td><td class="n up">0.012</td></tr><tr><td>Human academic (student + university essays) vs AI essays</td><td class="n">810</td><td class="n">908</td>
-    <td class="n">56.4%</td><td class="n up">85.1%</td>
-    <td class="n">1.11%</td><td class="n up">0.12%</td>
-    <td class="n">0.963</td><td class="n up">0.994</td>
-    <td class="n">0.717</td><td class="n up">0.919</td>
+    <td class="n">0.152</td><td class="n up">0.014</td></tr><tr><td>Human academic (student + university essays) vs AI essays</td><td class="n">810</td><td class="n">911</td>
+    <td class="n">56.2%</td><td class="n up">85.2%</td>
+    <td class="n">1.11%</td><td class="n up">0.00%</td>
+    <td class="n">0.962</td><td class="n up">0.995</td>
+    <td class="n">0.715</td><td class="n up">0.920</td>
     <td class="n">0.968</td><td class="n up">0.997</td>
-    <td class="n">0.170</td><td class="n up">0.013</td></tr><tr><td>Human creative (Reddit stories) vs AI stories</td><td class="n">450</td><td class="n">903</td>
-    <td class="n">21.9%</td><td class="n up">62.1%</td>
+    <td class="n">0.170</td><td class="n up">0.015</td></tr><tr><td>Human creative (Reddit stories) vs AI stories</td><td class="n">450</td><td class="n">906</td>
+    <td class="n">21.9%</td><td class="n up">62.6%</td>
     <td class="n">0.00%</td><td class="n ">0.44%</td>
-    <td class="n">0.844</td><td class="n up">0.968</td>
-    <td class="n">0.360</td><td class="n up">0.765</td>
-    <td class="n">0.925</td><td class="n up">0.985</td>
-    <td class="n">0.290</td><td class="n up">0.031</td></tr><tr><td>Human journalism (Reuters) vs AI news</td><td class="n">132</td><td class="n">266</td>
-    <td class="n">4.5%</td><td class="n up">48.9%</td>
+    <td class="n">0.844</td><td class="n up">0.978</td>
+    <td class="n">0.359</td><td class="n up">0.769</td>
+    <td class="n">0.925</td><td class="n up">0.990</td>
+    <td class="n">0.290</td><td class="n up">0.021</td></tr><tr><td>Human journalism (Reuters) vs AI news</td><td class="n">132</td><td class="n">268</td>
+    <td class="n">4.5%</td><td class="n up">59.7%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.831</td><td class="n up">0.975</td>
-    <td class="n">0.086</td><td class="n up">0.657</td>
-    <td class="n">0.923</td><td class="n up">0.990</td>
-    <td class="n">0.315</td><td class="n up">0.104</td></tr><tr><td>English-learner essays (human only)</td><td class="n">875</td><td class="n">0</td>
+    <td class="n">0.831</td><td class="n up">0.990</td>
+    <td class="n">0.086</td><td class="n up">0.748</td>
+    <td class="n">0.923</td><td class="n up">0.996</td>
+    <td class="n">0.315</td><td class="n up">0.049</td></tr><tr><td>English-learner essays (human only)</td><td class="n">875</td><td class="n">0</td>
     <td class="n">–</td><td class="n ">–</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
     <td class="n">–</td><td class="n ">–</td>
     <td class="n">–</td><td class="n ">–</td>
     <td class="n">–</td><td class="n ">–</td>
     <td class="n">–</td><td class="n ">–</td></tr><tr><td>Humanised AI news (undetectable.ai) vs Reuters</td><td class="n">132</td><td class="n">114</td>
-    <td class="n">10.5%</td><td class="n up">21.1%</td>
+    <td class="n">10.5%</td><td class="n up">28.1%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.338</td><td class="n up">0.995</td>
-    <td class="n">0.190</td><td class="n up">0.348</td>
-    <td class="n">0.545</td><td class="n up">0.993</td>
-    <td class="n">0.413</td><td class="n up">0.138</td></tr><tr><td>AI written with other prompts (prompt variants) vs same-genre humans</td><td class="n">2482</td><td class="n">4124</td>
-    <td class="n">64.7%</td><td class="n up">91.0%</td>
-    <td class="n">0.40%</td><td class="n ">0.12%</td>
+    <td class="n">0.338</td><td class="n up">0.998</td>
+    <td class="n">0.190</td><td class="n up">0.438</td>
+    <td class="n">0.545</td><td class="n up">0.998</td>
+    <td class="n">0.413</td><td class="n up">0.091</td></tr><tr><td>AI written with other prompts (prompt variants) vs same-genre humans</td><td class="n">2482</td><td class="n">4124</td>
+    <td class="n">64.7%</td><td class="n up">92.2%</td>
+    <td class="n">0.40%</td><td class="n ">0.08%</td>
     <td class="n">0.974</td><td class="n up">0.999</td>
-    <td class="n">0.784</td><td class="n up">0.953</td>
-    <td class="n">0.985</td><td class="n up">0.999</td>
-    <td class="n">0.157</td><td class="n up">0.020</td></tr><tr><td>Contemporary Claude Opus 5.5 (held out) vs all humans</td><td class="n">2339</td><td class="n">24</td>
-    <td class="n">12.5%</td><td class="n up">29.2%</td>
-    <td class="n">0.38%</td><td class="n ">0.13%</td>
-    <td class="n">0.700</td><td class="n up">0.863</td>
-    <td class="n">0.167</td><td class="n up">0.412</td>
-    <td class="n">0.078</td><td class="n up">0.294</td>
-    <td class="n">0.306</td><td class="n up">0.204</td></tr><tr><td>Opus 5.5 edited to sound like a student (simulated)</td><td class="n">0</td><td class="n">15</td>
-    <td class="n">0.0%</td><td class="n ">0.0%</td>
+    <td class="n">0.784</td><td class="n up">0.959</td>
+    <td class="n">0.985</td><td class="n up">1.000</td>
+    <td class="n">0.157</td><td class="n up">0.024</td></tr><tr><td>Contemporary Claude Opus 5.5 (held out) vs all humans</td><td class="n">2339</td><td class="n">39</td>
+    <td class="n">7.7%</td><td class="n up">35.9%</td>
+    <td class="n">0.38%</td><td class="n ">0.09%</td>
+    <td class="n">0.685</td><td class="n up">0.909</td>
+    <td class="n">0.118</td><td class="n up">0.509</td>
+    <td class="n">0.065</td><td class="n up">0.510</td>
+    <td class="n">0.318</td><td class="n up">0.154</td></tr><tr><td>Opus 5.5 edited to sound like a student (simulated)</td><td class="n">0</td><td class="n">15</td>
+    <td class="n">0.0%</td><td class="n up">40.0%</td>
     <td class="n">–</td><td class="n ">–</td>
     <td class="n">–</td><td class="n ">–</td>
-    <td class="n">–</td><td class="n ">–</td>
+    <td class="n">–</td><td class="n ">0.571</td>
     <td class="n">–</td><td class="n ">–</td>
     <td class="n">–</td><td class="n ">–</td></tr><tr><td>GPTZero comparison set (ChatGPT vs human)</td><td class="n">63</td><td class="n">60</td>
-    <td class="n">8.3%</td><td class="n down">6.7%</td>
+    <td class="n">8.3%</td><td class="n ">8.3%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.540</td><td class="n up">0.904</td>
-    <td class="n">0.154</td><td class="n down">0.125</td>
-    <td class="n">0.661</td><td class="n up">0.913</td>
-    <td class="n">0.385</td><td class="n up">0.159</td></tr><tr><td>Model family: gpt-3.5-turbo</td><td class="n">2339</td><td class="n">1031</td>
-    <td class="n">57.1%</td><td class="n up">85.5%</td>
-    <td class="n">0.38%</td><td class="n ">0.13%</td>
-    <td class="n">0.957</td><td class="n up">0.995</td>
-    <td class="n">0.723</td><td class="n up">0.921</td>
-    <td class="n">0.933</td><td class="n up">0.992</td>
-    <td class="n">0.152</td><td class="n up">0.018</td></tr><tr><td>Model family: claude-2023</td><td class="n">2339</td><td class="n">1029</td>
-    <td class="n">12.7%</td><td class="n up">56.2%</td>
-    <td class="n">0.38%</td><td class="n ">0.13%</td>
-    <td class="n">0.722</td><td class="n up">0.974</td>
-    <td class="n">0.224</td><td class="n up">0.718</td>
-    <td class="n">0.626</td><td class="n up">0.959</td>
-    <td class="n">0.288</td><td class="n up">0.059</td></tr><tr><td>Model family: claude-opus-5.5</td><td class="n">2339</td><td class="n">24</td>
-    <td class="n">12.5%</td><td class="n up">29.2%</td>
-    <td class="n">0.38%</td><td class="n ">0.13%</td>
-    <td class="n">0.700</td><td class="n up">0.863</td>
-    <td class="n">0.167</td><td class="n up">0.412</td>
-    <td class="n">0.078</td><td class="n up">0.294</td>
-    <td class="n">0.306</td><td class="n up">0.204</td></tr><tr><td>Model family: claude-imitation</td><td class="n">2339</td><td class="n">21</td>
-    <td class="n">47.6%</td><td class="n down">28.6%</td>
-    <td class="n">0.38%</td><td class="n ">0.13%</td>
+    <td class="n">0.540</td><td class="n up">0.879</td>
+    <td class="n">0.154</td><td class="n ">0.154</td>
+    <td class="n">0.661</td><td class="n up">0.884</td>
+    <td class="n">0.385</td><td class="n up">0.157</td></tr><tr><td>Model family: gpt-3.5-turbo</td><td class="n">2339</td><td class="n">1031</td>
+    <td class="n">57.1%</td><td class="n up">88.4%</td>
+    <td class="n">0.38%</td><td class="n ">0.09%</td>
+    <td class="n">0.957</td><td class="n up">0.997</td>
+    <td class="n">0.723</td><td class="n up">0.937</td>
+    <td class="n">0.933</td><td class="n up">0.996</td>
+    <td class="n">0.152</td><td class="n up">0.022</td></tr><tr><td>Model family: claude-2023</td><td class="n">2339</td><td class="n">1029</td>
+    <td class="n">12.7%</td><td class="n up">56.6%</td>
+    <td class="n">0.38%</td><td class="n ">0.09%</td>
+    <td class="n">0.722</td><td class="n up">0.982</td>
+    <td class="n">0.224</td><td class="n up">0.722</td>
+    <td class="n">0.626</td><td class="n up">0.971</td>
+    <td class="n">0.288</td><td class="n up">0.030</td></tr><tr><td>Model family: claude-opus-5.5</td><td class="n">2339</td><td class="n">39</td>
+    <td class="n">7.7%</td><td class="n up">35.9%</td>
+    <td class="n">0.38%</td><td class="n ">0.09%</td>
+    <td class="n">0.685</td><td class="n up">0.909</td>
+    <td class="n">0.118</td><td class="n up">0.509</td>
+    <td class="n">0.065</td><td class="n up">0.510</td>
+    <td class="n">0.318</td><td class="n up">0.154</td></tr><tr><td>Model family: claude-imitation</td><td class="n">2339</td><td class="n">21</td>
+    <td class="n">47.6%</td><td class="n down">38.1%</td>
+    <td class="n">0.38%</td><td class="n ">0.09%</td>
     <td class="n">0.963</td><td class="n up">0.993</td>
-    <td class="n">0.500</td><td class="n down">0.400</td>
-    <td class="n">0.453</td><td class="n up">0.536</td>
-    <td class="n">0.223</td><td class="n up">0.103</td></tr><tr><td>Model family: chatgpt-imitation</td><td class="n">2339</td><td class="n">6</td>
-    <td class="n">66.7%</td><td class="n ">66.7%</td>
-    <td class="n">0.38%</td><td class="n ">0.13%</td>
-    <td class="n">0.964</td><td class="n down">0.953</td>
-    <td class="n">0.421</td><td class="n up">0.615</td>
-    <td class="n">0.507</td><td class="n up">0.517</td>
-    <td class="n">0.173</td><td class="n up">0.129</td></tr><tr><td>Model family: chatgpt-unknown</td><td class="n">2339</td><td class="n">60</td>
-    <td class="n">8.3%</td><td class="n down">6.7%</td>
-    <td class="n">0.38%</td><td class="n ">0.13%</td>
-    <td class="n">0.406</td><td class="n up">0.965</td>
-    <td class="n">0.135</td><td class="n down">0.119</td>
-    <td class="n">0.067</td><td class="n up">0.394</td>
-    <td class="n">0.354</td><td class="n up">0.201</td></tr><tr><td>Edited: char-noise x100</td><td class="n">105</td><td class="n">94</td>
-    <td class="n">16.0%</td><td class="n up">59.6%</td>
+    <td class="n">0.500</td><td class="n up">0.516</td>
+    <td class="n">0.453</td><td class="n up">0.613</td>
+    <td class="n">0.223</td><td class="n up">0.074</td></tr><tr><td>Model family: chatgpt-imitation</td><td class="n">2339</td><td class="n">6</td>
+    <td class="n">66.7%</td><td class="n down">33.3%</td>
+    <td class="n">0.38%</td><td class="n ">0.09%</td>
+    <td class="n">0.964</td><td class="n ">0.964</td>
+    <td class="n">0.421</td><td class="n down">0.400</td>
+    <td class="n">0.507</td><td class="n down">0.438</td>
+    <td class="n">0.173</td><td class="n up">0.132</td></tr><tr><td>Model family: chatgpt-unknown</td><td class="n">2339</td><td class="n">60</td>
+    <td class="n">8.3%</td><td class="n ">8.3%</td>
+    <td class="n">0.38%</td><td class="n ">0.09%</td>
+    <td class="n">0.406</td><td class="n up">0.966</td>
+    <td class="n">0.135</td><td class="n up">0.149</td>
+    <td class="n">0.067</td><td class="n up">0.408</td>
+    <td class="n">0.354</td><td class="n up">0.172</td></tr><tr><td>Edited: char-noise x100</td><td class="n">105</td><td class="n">94</td>
+    <td class="n">16.0%</td><td class="n up">66.0%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.919</td><td class="n up">0.983</td>
-    <td class="n">0.275</td><td class="n up">0.747</td>
-    <td class="n">0.925</td><td class="n up">0.984</td>
-    <td class="n">0.298</td><td class="n up">0.083</td></tr><tr><td>Edited: char-noise x20</td><td class="n">87</td><td class="n">72</td>
-    <td class="n">31.9%</td><td class="n up">62.5%</td>
+    <td class="n">0.919</td><td class="n up">0.982</td>
+    <td class="n">0.275</td><td class="n up">0.795</td>
+    <td class="n">0.925</td><td class="n up">0.988</td>
+    <td class="n">0.298</td><td class="n up">0.056</td></tr><tr><td>Edited: char-noise x20</td><td class="n">87</td><td class="n">72</td>
+    <td class="n">31.9%</td><td class="n up">69.4%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.913</td><td class="n up">0.986</td>
-    <td class="n">0.484</td><td class="n up">0.769</td>
-    <td class="n">0.906</td><td class="n up">0.986</td>
-    <td class="n">0.251</td><td class="n up">0.066</td></tr><tr><td>Edited: char-noise x5</td><td class="n">80</td><td class="n">61</td>
-    <td class="n">34.4%</td><td class="n up">65.6%</td>
+    <td class="n">0.913</td><td class="n up">0.983</td>
+    <td class="n">0.484</td><td class="n up">0.820</td>
+    <td class="n">0.906</td><td class="n up">0.983</td>
+    <td class="n">0.251</td><td class="n up">0.054</td></tr><tr><td>Edited: char-noise x5</td><td class="n">80</td><td class="n">61</td>
+    <td class="n">34.4%</td><td class="n up">68.9%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
     <td class="n">0.927</td><td class="n up">0.989</td>
-    <td class="n">0.512</td><td class="n up">0.792</td>
-    <td class="n">0.910</td><td class="n up">0.986</td>
-    <td class="n">0.239</td><td class="n up">0.053</td></tr><tr><td>Edited: paragraph-edits x5</td><td class="n">76</td><td class="n">63</td>
-    <td class="n">38.1%</td><td class="n up">69.8%</td>
+    <td class="n">0.512</td><td class="n up">0.816</td>
+    <td class="n">0.910</td><td class="n up">0.987</td>
+    <td class="n">0.239</td><td class="n up">0.052</td></tr><tr><td>Edited: paragraph-edits x5</td><td class="n">76</td><td class="n">63</td>
+    <td class="n">38.1%</td><td class="n up">73.0%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.927</td><td class="n up">0.987</td>
-    <td class="n">0.552</td><td class="n up">0.822</td>
-    <td class="n">0.920</td><td class="n up">0.986</td>
-    <td class="n">0.228</td><td class="n up">0.040</td></tr><tr><td>Edited: paragraph-paraphrase x5</td><td class="n">79</td><td class="n">68</td>
+    <td class="n">0.927</td><td class="n up">0.989</td>
+    <td class="n">0.552</td><td class="n up">0.844</td>
+    <td class="n">0.920</td><td class="n up">0.988</td>
+    <td class="n">0.228</td><td class="n up">0.067</td></tr><tr><td>Edited: paragraph-paraphrase x5</td><td class="n">79</td><td class="n">68</td>
     <td class="n">33.8%</td><td class="n up">70.6%</td>
     <td class="n">1.27%</td><td class="n up">0.00%</td>
-    <td class="n">0.897</td><td class="n up">0.970</td>
+    <td class="n">0.897</td><td class="n up">0.977</td>
     <td class="n">0.500</td><td class="n up">0.828</td>
-    <td class="n">0.893</td><td class="n up">0.974</td>
-    <td class="n">0.199</td><td class="n up">0.048</td></tr><tr><td>Edited: sentence-edits x5</td><td class="n">74</td><td class="n">61</td>
-    <td class="n">34.4%</td><td class="n up">54.1%</td>
+    <td class="n">0.893</td><td class="n up">0.977</td>
+    <td class="n">0.199</td><td class="n up">0.051</td></tr><tr><td>Edited: sentence-edits x5</td><td class="n">74</td><td class="n">61</td>
+    <td class="n">34.4%</td><td class="n up">49.2%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.921</td><td class="n up">0.973</td>
-    <td class="n">0.512</td><td class="n up">0.702</td>
-    <td class="n">0.912</td><td class="n up">0.974</td>
-    <td class="n">0.231</td><td class="n up">0.118</td></tr><tr><td>Edited: sentence-paraphrase x5</td><td class="n">81</td><td class="n">70</td>
-    <td class="n">35.7%</td><td class="n up">50.0%</td>
+    <td class="n">0.921</td><td class="n up">0.956</td>
+    <td class="n">0.512</td><td class="n up">0.659</td>
+    <td class="n">0.912</td><td class="n up">0.968</td>
+    <td class="n">0.231</td><td class="n up">0.117</td></tr><tr><td>Edited: sentence-paraphrase x5</td><td class="n">81</td><td class="n">70</td>
+    <td class="n">35.7%</td><td class="n up">52.9%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.926</td><td class="n up">0.969</td>
-    <td class="n">0.526</td><td class="n up">0.667</td>
-    <td class="n">0.916</td><td class="n up">0.973</td>
-    <td class="n">0.237</td><td class="n up">0.122</td></tr><tr><td>Edited: word-edits x100</td><td class="n">101</td><td class="n">85</td>
-    <td class="n">17.6%</td><td class="n up">57.6%</td>
+    <td class="n">0.926</td><td class="n up">0.957</td>
+    <td class="n">0.526</td><td class="n up">0.692</td>
+    <td class="n">0.916</td><td class="n up">0.970</td>
+    <td class="n">0.237</td><td class="n up">0.103</td></tr><tr><td>Edited: word-edits x100</td><td class="n">101</td><td class="n">85</td>
+    <td class="n">17.6%</td><td class="n up">61.2%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.907</td><td class="n up">0.977</td>
-    <td class="n">0.300</td><td class="n up">0.731</td>
-    <td class="n">0.917</td><td class="n up">0.978</td>
-    <td class="n">0.285</td><td class="n up">0.099</td></tr><tr><td>Edited: word-edits x20</td><td class="n">75</td><td class="n">62</td>
+    <td class="n">0.907</td><td class="n up">0.983</td>
+    <td class="n">0.300</td><td class="n up">0.759</td>
+    <td class="n">0.917</td><td class="n up">0.984</td>
+    <td class="n">0.285</td><td class="n up">0.072</td></tr><tr><td>Edited: word-edits x20</td><td class="n">75</td><td class="n">62</td>
     <td class="n">25.8%</td><td class="n up">64.5%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.926</td><td class="n up">0.982</td>
+    <td class="n">0.926</td><td class="n up">0.983</td>
     <td class="n">0.410</td><td class="n up">0.784</td>
-    <td class="n">0.927</td><td class="n up">0.981</td>
-    <td class="n">0.241</td><td class="n up">0.067</td></tr><tr><td>Edited: word-edits x5</td><td class="n">74</td><td class="n">60</td>
-    <td class="n">33.3%</td><td class="n up">66.7%</td>
+    <td class="n">0.927</td><td class="n up">0.982</td>
+    <td class="n">0.241</td><td class="n up">0.049</td></tr><tr><td>Edited: word-edits x5</td><td class="n">74</td><td class="n">60</td>
+    <td class="n">33.3%</td><td class="n up">71.7%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
     <td class="n">0.914</td><td class="n up">0.987</td>
-    <td class="n">0.500</td><td class="n up">0.800</td>
+    <td class="n">0.500</td><td class="n up">0.835</td>
     <td class="n">0.902</td><td class="n up">0.985</td>
-    <td class="n">0.223</td><td class="n up">0.050</td></tr><tr><td>Edited: word-synonyms x100</td><td class="n">98</td><td class="n">83</td>
-    <td class="n">37.3%</td><td class="n up">68.7%</td>
+    <td class="n">0.223</td><td class="n up">0.061</td></tr><tr><td>Edited: word-synonyms x100</td><td class="n">98</td><td class="n">83</td>
+    <td class="n">37.3%</td><td class="n up">71.1%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.945</td><td class="n up">0.989</td>
-    <td class="n">0.544</td><td class="n up">0.814</td>
-    <td class="n">0.943</td><td class="n up">0.988</td>
-    <td class="n">0.241</td><td class="n up">0.052</td></tr><tr><td>Edited: word-synonyms x20</td><td class="n">82</td><td class="n">68</td>
-    <td class="n">39.7%</td><td class="n up">67.6%</td>
+    <td class="n">0.945</td><td class="n up">0.992</td>
+    <td class="n">0.544</td><td class="n up">0.831</td>
+    <td class="n">0.943</td><td class="n up">0.991</td>
+    <td class="n">0.241</td><td class="n up">0.035</td></tr><tr><td>Edited: word-synonyms x20</td><td class="n">82</td><td class="n">68</td>
+    <td class="n">39.7%</td><td class="n up">70.6%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.935</td><td class="n up">0.984</td>
-    <td class="n">0.568</td><td class="n up">0.807</td>
-    <td class="n">0.933</td><td class="n up">0.983</td>
-    <td class="n">0.212</td><td class="n up">0.058</td></tr><tr><td>Edited: word-synonyms x5</td><td class="n">78</td><td class="n">61</td>
-    <td class="n">36.1%</td><td class="n up">67.2%</td>
+    <td class="n">0.935</td><td class="n up">0.989</td>
+    <td class="n">0.568</td><td class="n up">0.828</td>
+    <td class="n">0.933</td><td class="n up">0.988</td>
+    <td class="n">0.212</td><td class="n up">0.046</td></tr><tr><td>Edited: word-synonyms x5</td><td class="n">78</td><td class="n">61</td>
+    <td class="n">36.1%</td><td class="n up">70.5%</td>
     <td class="n">0.00%</td><td class="n ">0.00%</td>
-    <td class="n">0.924</td><td class="n up">0.988</td>
-    <td class="n">0.530</td><td class="n up">0.804</td>
-    <td class="n">0.911</td><td class="n up">0.986</td>
-    <td class="n">0.230</td><td class="n up">0.061</td></tr></table></div>
+    <td class="n">0.924</td><td class="n up">0.989</td>
+    <td class="n">0.530</td><td class="n up">0.827</td>
+    <td class="n">0.911</td><td class="n up">0.987</td>
+    <td class="n">0.230</td><td class="n up">0.062</td></tr></table></div>
 <div class="card"><h2>Human false positives by source</h2><div class="wrap"><table><tr><th>Source</th><th class="n">Texts</th><th class="n">v9 flagged</th><th class="n">v10 flagged</th></tr>
-<tr><td>ghostbuster/essay/human</td><td class="n">446</td><td class="n">7</td><td class="n up">1</td></tr><tr><td>ghostbuster/wp/human</td><td class="n">450</td><td class="n">0</td><td class="n down">2</td></tr><tr><td>ghostbuster/reuter/human</td><td class="n">132</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/ets</td><td class="n">353</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/lang8</td><td class="n">332</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/pelic</td><td class="n">150</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/toefl91</td><td class="n">40</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/bawe</td><td class="n">364</td><td class="n">2</td><td class="n up">0</td></tr><tr><td>ghostbuster/other/gptzero/human</td><td class="n">63</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>repo/testlab</td><td class="n">9</td><td class="n">0</td><td class="n ">0</td></tr></table></div></div>
-<div class="card"><h2>Mixed-origin essays</h2><p>375 held-out student essays with one AI paragraph (same prompt) pasted into the middle. Flagged as Mixed or AI-leaning: v9 11, v10 10. The same essays without the AI paragraph: v9 12, v10 5.</p></div>
+<tr><td>ghostbuster/essay/human</td><td class="n">446</td><td class="n">7</td><td class="n up">0</td></tr><tr><td>ghostbuster/wp/human</td><td class="n">450</td><td class="n">0</td><td class="n down">2</td></tr><tr><td>ghostbuster/reuter/human</td><td class="n">132</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/ets</td><td class="n">353</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/lang8</td><td class="n">332</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/pelic</td><td class="n">150</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/toefl91</td><td class="n">40</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>ghostbuster/other/bawe</td><td class="n">364</td><td class="n">2</td><td class="n up">0</td></tr><tr><td>ghostbuster/other/gptzero/human</td><td class="n">63</td><td class="n">0</td><td class="n ">0</td></tr><tr><td>repo/testlab</td><td class="n">9</td><td class="n">0</td><td class="n ">0</td></tr></table></div></div>
+<div class="card"><h2>Which AI? (Claude vs ChatGPT attribution)</h2><div class="wrap"><table><tr><th>AI texts</th><th class="n">Texts</th><th class="n">Right v9</th><th class="n">v11</th><th class="n">Wrong v9</th><th class="n">v11</th><th class="n">Can't tell v9</th><th class="n">v11</th></tr>
+<tr><td>gpt-3.5-turbo</td><td class="n">1019</td><td class="n">21.3%</td><td class="n up">98.6%</td><td class="n">0.8%</td><td class="n ">0.6%</td><td class="n">77.9%</td><td class="n">0.8%</td></tr><tr><td>claude-2023</td><td class="n">923</td><td class="n">2.8%</td><td class="n up">90.9%</td><td class="n">6.2%</td><td class="n up">5.1%</td><td class="n">91.0%</td><td class="n">4.0%</td></tr><tr><td>gpt-3.5-turbo (prompt-variant)</td><td class="n">4107</td><td class="n">28.1%</td><td class="n up">99.2%</td><td class="n">0.3%</td><td class="n ">0.3%</td><td class="n">71.5%</td><td class="n">0.5%</td></tr><tr><td>chatgpt-unknown</td><td class="n">52</td><td class="n">1.9%</td><td class="n up">96.2%</td><td class="n">0.0%</td><td class="n ">0.0%</td><td class="n">98.1%</td><td class="n">3.8%</td></tr><tr><td>gpt-3.5+humaniser (humaniser)</td><td class="n">114</td><td class="n">3.5%</td><td class="n up">97.4%</td><td class="n">0.0%</td><td class="n down">2.6%</td><td class="n">96.5%</td><td class="n">0.0%</td></tr><tr><td>claude-imitation</td><td class="n">21</td><td class="n">28.6%</td><td class="n up">71.4%</td><td class="n">0.0%</td><td class="n down">19.0%</td><td class="n">71.4%</td><td class="n">9.5%</td></tr><tr><td>claude-opus-5.5</td><td class="n">25</td><td class="n">16.0%</td><td class="n up">88.0%</td><td class="n">0.0%</td><td class="n down">8.0%</td><td class="n">84.0%</td><td class="n">4.0%</td></tr><tr><td>claude-opus-5.5 (human-edited-simulated)</td><td class="n">9</td><td class="n">11.1%</td><td class="n up">100.0%</td><td class="n">0.0%</td><td class="n ">0.0%</td><td class="n">88.9%</td><td class="n">0.0%</td></tr><tr><td>chatgpt-imitation</td><td class="n">5</td><td class="n">80.0%</td><td class="n down">40.0%</td><td class="n">0.0%</td><td class="n down">20.0%</td><td class="n">20.0%</td><td class="n">40.0%</td></tr></table></div>
+<p class="muted">Counted on AI texts that v11 did not call "likely human" (it doesn't name a model for those). "chatgpt-imitation" texts were written by Claude imitating ChatGPT, so "Claude" is arguably the right answer for them.</p></div>
+<div class="card"><h2>Mixed-origin essays</h2><p>375 held-out student essays with one AI paragraph (same prompt) pasted into the middle. Flagged as Mixed or AI-leaning: v9 11, v10 9. The same essays without the AI paragraph: v9 12, v10 5.</p></div>
 <p class="muted">Limits: AI texts are mostly gpt-3.5-turbo and Claude (2023); contemporary coverage is 54 Claude Opus 5.5 texts. No GPT-5/6, Gemini, DeepSeek or Llama samples were available. Edited-text conditions are Ghostbuster's automatic perturbations of news articles.</p>
 </main></body></html>

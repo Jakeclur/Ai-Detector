@@ -36,13 +36,40 @@ function stCosine(a, b) {
   return na && nb ? d / Math.sqrt(na * nb) : 0;
 }
 
-// Returns { f: {name: number}, tok: Map(token -> count), n: token count, obs: {display-only values} }
+// Coarse grammatical classes for the word-class pattern profile (a cheap stand-in for part-of-speech tags)
+const ST_CLASS = {};
+for (const [c, ws] of Object.entries({
+  DET: "a an the this that these those each every some any no",
+  PRON: "i me my mine we us our you your he him his she her they them their it its myself itself themselves",
+  PREP: "of in on at to from by with about as into onto upon over under between through during before after since until for without within across against towards toward",
+  CONJ: "and or but nor so yet because although though if unless whether while than",
+  AUX: "is am are was were be been being have has had do does did can could will would shall should may might must",
+  NEG: "not never n't",
+  WH: "what when where why how which who whom whose",
+  ADV: "very also just only even still too more most much really quite then there here now always often"
+})) for (const w of ws.split(" ")) ST_CLASS[w] = c;
+function stClassOf(tok, prev) {
+  if (ST_CLASS[tok]) return ST_CLASS[tok];
+  if (/^[.,;:!?()"—–]$/.test(tok)) return tok;
+  if (/^[0-9]+$/.test(tok)) return "NUM";
+  if (/'/.test(tok)) return "CONTR";
+  if (/ing$/.test(tok)) return "ING";
+  if (/ed$/.test(tok)) return "ED";
+  if (/ly$/.test(tok)) return "LY";
+  if (/(?:tion|sion|ment|ness|ity|ance|ence)s?$/.test(tok)) return "NOM";
+  if (/s$/.test(tok) && tok.length > 3) return "WS";
+  return "W";
+}
+// Returns { f: {name: number}, tok: Map(token -> count), cls: Map(class bigram -> count), n: token count, obs: {display-only values} }
 function styleFeatures(text) {
   const tok = stTokens(text);
   const words = tok.filter(w => /[a-z0-9]/.test(w));
   const n = Math.max(1, words.length);
   const per100 = c => c / n * 100;
   const counts = new Map(); for (const w of tok) counts.set(w, (counts.get(w) || 0) + 1);
+  // word-class bigrams ("DET W", "W PREP", "PRON AUX", ", CONJ", …)
+  const cls = new Map(); let prevC = "^";
+  for (const w of tok) { const c = stClassOf(w); const k = prevC + " " + c; cls.set(k, (cls.get(k) || 0) + 1); prevC = c === "." || c === "!" || c === "?" ? "^" : c; }
   const cnt = w => counts.get(w) || 0;
   const sents = stSentences(text);
   const lens = sents.map(s => (s.match(/[A-Za-z0-9'’-]+/g) || []).length).filter(x => x > 0);
@@ -91,7 +118,7 @@ function styleFeatures(text) {
     tmpl_rep: tmplRep, parallel: sents.length > 1 ? parallel / (sents.length - 1) : 0, open_rep: openRep, discourse,
     ov_mean: ovMean, ov_sd: ovSd, intro_concl: introConcl, tri_rep: triRep
   };
-  return { f, tok: counts, n: tok.length, obs: { mattr: k ? mattr / k : 0, wordLen: words.reduce((a, w) => a + w.length, 0) / n, sentences: lens.length, paragraphs: paras.length } };
+  return { f, tok: counts, cls, n: tok.length, obs: { mattr: k ? mattr / k : 0, wordLen: words.reduce((a, w) => a + w.length, 0) / n, sentences: lens.length, paragraphs: paras.length } };
 }
 
 // Rough genre guess, used for genre-aware cut-offs and for the out-of-distribution check.

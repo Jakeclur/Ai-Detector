@@ -6,7 +6,8 @@
 //   1. loads every labelled document (tests/lib/datasets.js) and keeps only the "train" split
 //   2. extracts three feature families: the rule clues (src/core.js), statistical/structural/semantic
 //      features (src/stats.js) and a function-word profile (the ~300 most common tokens)
-//   3. fits an L2-regularised logistic regression with fairness constraints:
+//   3. fits an L2-regularised logistic regression AND small gradient-boosted trees (blended 50/50; the trees
+//      can learn combinations of clues) with fairness constraints:
 //        - rule clues keep their direction (an "AI habit" can't become a human sign and vice versa)
 //        - contractions, slips and slang can only push towards human
 //        - human texts count 2x in the loss
@@ -19,6 +20,8 @@ const path = require("path");
 const E = require("../src/core.js");
 const S = require("../src/stats.js");
 const D = require("./lib/datasets.js");
+const GB = require("./lib/gbdt.js");
+const GBDT_OPTS = { trees: 250, depth: 3, lr: 0.08, lambda: 5, minLeaf: 40, colsample: 0.5 };
 
 const ARGS = process.argv.slice(2);
 const OUT = path.join(__dirname, "../src/model.json");
@@ -31,7 +34,7 @@ function extract(doc) {
   const text = E.cleanText(doc.text).text;
   if (E.nWords(text) < 40) return null;
   const F = E.features(text), sf = S.styleFeatures(text);
-  return { rules: F.f, style: sf.f, tok: sf.tok, n: sf.n, genre: S.guessGenre(text, sf), wc: F.wc };
+  return { rules: F.f, style: sf.f, tok: sf.tok, cls: sf.cls, n: sf.n, genre: S.guessGenre(text, sf), wc: F.wc };
 }
 
 function buildVocab(rows) {
@@ -42,20 +45,28 @@ function buildVocab(rows) {
     .sort((a, b) => ((dfH.get(b) || 0) + (dfA.get(b) || 0)) - ((dfH.get(a) || 0) + (dfA.get(a) || 0))).slice(0, 300);
 }
 
+function buildClassVocab(rows, n) {
+  const df = new Map();
+  for (const r of rows) for (const t of r.x.cls.keys()) df.set(t, (df.get(t) || 0) + 1);
+  return [...df.entries()].filter(([, c]) => c / rows.length >= 0.05).sort((a, b) => b[1] - a[1]).slice(0, n).map(([t]) => t);
+}
+
 function vectorise(x, spec) {
   const v = new Float64Array(spec.names.length); let i = 0;
   if (spec.useRules) for (const k of RULE_KEYS) v[i++] = Math.min(x.rules[k], E.MODEL.cap[k] ?? Infinity);
   if (spec.useStyle) for (const k of spec.styleKeys) v[i++] = x.style[k];
   if (spec.useVocab) { const n = Math.max(1, x.n); for (const t of spec.vocab) v[i++] = Math.sqrt((x.tok.get(t) || 0) / n * 100); }
+  if (spec.useClass) { const n = Math.max(1, x.n); for (const t of spec.classVocab) v[i++] = Math.sqrt((x.cls.get(t) || 0) / n * 100); }
   return v;
 }
 
 function makeSpec(rows, opts) {
   const styleKeys = Object.keys(rows[0].x.style);
   const vocab = opts.useVocab ? buildVocab(rows) : [];
-  const names = [...(opts.useRules ? RULE_KEYS.map(k => "rule:" + k) : []), ...(opts.useStyle ? styleKeys.map(k => "style:" + k) : []), ...vocab.map(t => "tok:" + t)];
-  const sign = names.map(n => n.startsWith("rule:") ? RULE_SIGN[n.slice(5)] : n.startsWith("tok:") && FAIR_NEG.test(n.slice(4)) ? -1 : 0);
-  return { ...opts, styleKeys, vocab, names, sign };
+  const classVocab = opts.useClass ? buildClassVocab(rows, opts.classN || 200) : [];
+  const names = [...(opts.useRules ? RULE_KEYS.map(k => "rule:" + k) : []), ...(opts.useStyle ? styleKeys.map(k => "style:" + k) : []), ...vocab.map(t => "tok:" + t), ...classVocab.map(t => "cls:" + t)];
+  const sign = names.map(n => n.startsWith("rule:") ? RULE_SIGN[n.slice(5)] : n.startsWith("tok:") && FAIR_NEG.test(n.slice(4)) ? -1 : n.startsWith("cls:") && n.includes("CONTR") ? -1 : 0);
+  return { ...opts, styleKeys, vocab, classVocab, names, sign };
 }
 
 function standardise(X, spec) {
@@ -99,14 +110,17 @@ function weightsFor(rows) {
 }
 
 // group k-fold: returns out-of-fold logits
-function crossValidate(rows, spec, Z, k = 5) {
+function crossValidate(rows, spec, Z, k = 5, useGbdt = false) {
   const groups = [...new Set(rows.map(r => r.group))];
   const fold = new Map(groups.map(g => [g, parseInt(require("crypto").createHash("md5").update(g).digest("hex").slice(0, 6), 16) % k]));
   const oof = new Float64Array(rows.length);
   for (let f = 0; f < k; f++) {
     const tr = rows.map((r, i) => i).filter(i => fold.get(rows[i].group) !== f);
-    const m = fitLogistic(tr.map(i => Z[i]), tr.map(i => rows[i].y), weightsFor(tr.map(i => rows[i])), spec);
-    rows.forEach((r, i) => { if (fold.get(r.group) === f) oof[i] = logit(m, Z[i]) * lenFactor(r.x.wc); });
+    const w = weightsFor(tr.map(i => rows[i]));
+    const m = fitLogistic(tr.map(i => Z[i]), tr.map(i => rows[i].y), w, spec);
+    const g = useGbdt ? GB.fitGBDT(tr.map(i => Z[i]), tr.map(i => rows[i].y), w, { ...GBDT_OPTS, sign: spec.sign }) : null;
+    // blend: average of the linear logit and the boosted-tree logit, then the length shrink
+    rows.forEach((r, i) => { if (fold.get(r.group) === f) oof[i] = (g ? (logit(m, Z[i]) + GB.predictGBDT(g, Z[i])) / 2 : logit(m, Z[i])) * lenFactor(r.x.wc); });
   }
   return oof;
 }
@@ -124,7 +138,7 @@ function platt(z, y) {
   return { a, c };
 }
 
-function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2 } = {}) {
+function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2, gbdt = false } = {}) {
   if (l2 != null) L2 = l2;
   if (opts.modernWeight != null) MODERN_WEIGHT = opts.modernWeight;
   if (opts.humanWeight != null) HUMAN_WEIGHT = opts.humanWeight;
@@ -132,7 +146,7 @@ function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2
   const X = rows.map(r => vectorise(r.x, spec));
   const { mu, sd } = standardise(X, spec);
   const Z = X.map(v => v.map((x, j) => (x - mu[j]) / sd[j]));
-  const oof = crossValidate(rows, spec, Z);
+  const oof = crossValidate(rows, spec, Z, 5, gbdt);
   const cal = platt(Array.from(oof), rows.map(r => r.y));
   // cut-offs from out-of-fold HUMAN probabilities: AI-leaning when p >= the 99.7th percentile of humans (stricter
   // per genre where needed); "likely human" when p <= the 95th percentile, so at most ~5% of real people land in
@@ -140,13 +154,14 @@ function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2
   const prob = z => 1 / (1 + Math.exp(-(cal.a * z + cal.c)));
   const pct = (a, q) => { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
   const humP = rows.map((r, i) => [r, prob(oof[i])]).filter(([r]) => !r.y);
-  const globalHi = pct(humP.map(x => x[1]), hiPct), globalLo = pct(humP.map(x => x[1]), 0.95);
+  const globalHi = pct(humP.map(x => x[1]), hiPct), globalLo = Math.max(0.5, pct(humP.map(x => x[1]), 0.95));
   const genreCut = {}, genreLo = {};
   for (const g of ["academic", "creative", "news", "explanation", "conversational", "other"]) {
     const ps = humP.filter(([r]) => r.x.genre === g).map(x => x[1]);
     // genres with few human examples get a stricter cut-off
     genreCut[g] = ps.length >= 100 ? Math.max(globalHi, pct(ps, genrePct)) : Math.max(globalHi, ps.length ? Math.max(...ps) : globalHi, 0.97);
-    genreLo[g] = ps.length >= 100 ? Math.max(globalLo, pct(ps, 0.95)) : globalLo;
+    // "likely human": below 50 (the text looks more human than AI) or the 95th percentile of humans, whichever is higher
+    genreLo[g] = Math.max(0.5, ps.length >= 100 ? Math.max(globalLo, pct(ps, 0.95)) : globalLo);
   }
   // bootstrap members on all training data (resampling groups)
   const groups = [...new Set(rows.map(r => r.group))];
@@ -160,7 +175,9 @@ function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2
   // training range per feature (for the out-of-distribution check)
   const lo = new Float64Array(spec.names.length).fill(Infinity), hi = new Float64Array(spec.names.length).fill(-Infinity);
   for (const z of Z) for (let j = 0; j < z.length; j++) { if (z[j] < lo[j]) lo[j] = z[j]; if (z[j] > hi[j]) hi[j] = z[j]; }
-  return { spec, mu, sd, members: ms, cal, cut: { lo: globalLo, hi: globalHi, genre: genreCut, genreLo }, oof, range: { lo, hi } };
+  // boosted trees on all training data (monotone constraints from the same fairness signs)
+  const gb = gbdt ? GB.fitGBDT(Z, rows.map(r => r.y), weightsFor(rows), { ...GBDT_OPTS, sign: spec.sign }) : null;
+  return { spec, mu, sd, members: ms, gbdt: gb, cal, cut: { lo: globalLo, hi: globalHi, genre: genreCut, genreLo }, oof, range: { lo, hi } };
 }
 
 function loadRows(split) {
@@ -179,12 +196,13 @@ function toJSON(M) {
   const r = a => Array.from(a, v => +v.toFixed(5));
   return {
     version: 10, trained: new Date().toISOString().slice(0, 10),
-    features: M.spec.names, ruleKeys: M.spec.useRules ? RULE_KEYS : [], styleKeys: M.spec.useStyle ? M.spec.styleKeys : [], vocab: M.spec.vocab,
+    features: M.spec.names, ruleKeys: M.spec.useRules ? RULE_KEYS : [], styleKeys: M.spec.useStyle ? M.spec.styleKeys : [], vocab: M.spec.vocab, classVocab: M.spec.classVocab || [],
     mu: r(M.mu), sd: r(M.sd), members: M.members.map(m => ({ b: +m.b.toFixed(5), w: r(m.beta) })),
     calibration: { a: +M.cal.a.toFixed(5), c: +M.cal.c.toFixed(5) },
     cutoffs: { human: +M.cut.lo.toFixed(4), ai: +M.cut.hi.toFixed(4), genre: Object.fromEntries(Object.entries(M.cut.genre).map(([k, v]) => [k, +v.toFixed(4)])),
       humanGenre: Object.fromEntries(Object.entries(M.cut.genreLo || {}).map(([k, v]) => [k, +v.toFixed(4)])) },
-    range: { lo: r(M.range.lo), hi: r(M.range.hi) }, length: LENGTH
+    range: { lo: r(M.range.lo), hi: r(M.range.hi) }, length: LENGTH,
+    gbdt: M.gbdt ? GB.packGBDT(M.gbdt) : null
   };
 }
 
@@ -195,14 +213,29 @@ if (require.main === module) {
   const rows = loadRows("train");
   console.log(`training rows: ${rows.length} (${rows.filter(r => !r.y).length} human, ${rows.filter(r => r.y).length} AI) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   // 1) general model: every training text
-  const M = trainAll(rows, { useRules: true, useStyle: true, useVocab: true, modernWeight: 8, humanWeight: 2 }, { l2: 0.01 });
+  // cut-offs at the 99.8th / 99.9th percentile of out-of-fold human scores: by construction about 0.1-0.2% of real
+  // people score above them. (A 99.3rd-percentile cut-off looked good on one held-out run but flagged 0.7% of humans
+  // after retraining, as its percentile implies, so it was rejected.)
+  const M = trainAll(rows, { useRules: true, useStyle: true, useVocab: true, modernWeight: 8, humanWeight: 2 }, { l2: 0.01, gbdt: true, hiPct: 0.998, genrePct: 0.999 });
   const json = toJSON(M);
   // 2) specialist for recent Claude: Opus 5.5 texts vs all human texts, with a stricter cut-off.
   //    The general model is dominated by 2023 writing; this one only looks for what separates modern Claude.
   const spec = rows.filter(r => !r.y || r.doc.model === "claude-opus-5.5");
   const S = toJSON(trainAll(spec, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.998, genrePct: 0.998, members: 5 }));
   json.specialists = [{ name: "claude-modern", label: "recent Claude (Opus 5.5-like)", features: S.features, ruleKeys: S.ruleKeys, styleKeys: S.styleKeys, vocab: S.vocab,
-    mu: S.mu, sd: S.sd, members: S.members, calibration: S.calibration, cutoffs: { ai: S.cutoffs.ai }, length: S.length, trainedOn: spec.filter(r => r.y).length + " Opus 5.5 texts" }];
+    mu: S.mu, sd: S.sd, members: S.members, calibration: S.calibration, cutoffs: { ai: S.cutoffs.ai }, length: S.length, trainedOn: spec.filter(r => r.y).length + " Opus 5.5 texts",
+    minGeneral: 0.05 }];   // only counts when the general model gives at least 5%: stops extreme disagreements (a Reddit dialogue story scored 0 vs 0.92)
+  // 3) humaniser specialist: AI text run through a humaniser tool vs all human texts (strict cut-off)
+  const hum = rows.filter(r => !r.y || r.doc.condition === "humaniser");
+  const HS = toJSON(trainAll(hum, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.999, genrePct: 0.999, members: 5 }));
+  json.specialists.push({ name: "humaniser", label: "AI text run through a humaniser tool", features: HS.features, ruleKeys: HS.ruleKeys, styleKeys: HS.styleKeys, vocab: HS.vocab,
+    mu: HS.mu, sd: HS.sd, members: HS.members, calibration: HS.calibration, cutoffs: { ai: HS.cutoffs.ai }, length: HS.length, minGeneral: 0.05 });
+  // 4) attribution: Claude vs ChatGPT, trained on AI texts only (held-out accuracy 95-98% on real 2023 and Opus 5.5 text)
+  const fam = d => /claude/.test(d.model) ? 1 : /gpt|chatgpt/.test(d.model) ? 0 : null;
+  const at = rows.filter(r => r.y && fam(r.doc) !== null).map(r => ({ ...r, y: fam(r.doc), modern: /opus/.test(r.doc.model) }));
+  const A = toJSON(trainAll(at, { useRules: true, useStyle: true, useVocab: true, modernWeight: 5, humanWeight: 1 }, { l2: 0.01, gbdt: true, members: 3 }));
+  json.attribution = { classes: ["chatgpt", "claude"], features: A.features, ruleKeys: A.ruleKeys, styleKeys: A.styleKeys, vocab: A.vocab, mu: A.mu, sd: A.sd,
+    members: A.members, calibration: A.calibration, length: A.length, gbdt: A.gbdt, trainedOn: `${at.filter(r => r.y).length} Claude and ${at.filter(r => !r.y).length} ChatGPT texts` };
   fs.writeFileSync(OUT, JSON.stringify(json));
   console.log(`wrote ${OUT} (${(fs.statSync(OUT).size / 1024).toFixed(0)} KB) in ${((Date.now() - t0) / 1000).toFixed(0)}s; cut-offs`, json.cutoffs, "specialist cut", S.cutoffs.ai);
 }

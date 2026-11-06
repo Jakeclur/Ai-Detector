@@ -1,6 +1,6 @@
 // ==CORE==
 /* =====================================================================
-   AI Text Detector engine (v9). Rules only: no trained text model, no network.
+   AI Text Detector engine (v11 rule engine). Rules only: no trained text model, no network.
    Evidence sources (see the page's "research" section):
    - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
    - Reinhart et al., PNAS 2025 (participial clauses etc.)
@@ -471,9 +471,12 @@ function suspect(text, r, a) {
   let name = null, version = "", why = "";
   if (lean === "claude") {
     const old = /\bgenuinely\b|\bthe honest answer\b|\bmatters enormously\b/.test(lower) || dashRate >= 3;
-    name = old ? "Claude (older version, like Opus 5 or Sonnet)" : "Claude Opus 5.5 (or another recent Claude)";
-    version = old ? "claude-old" : "claude-opus-5.5";
-    why = old ? "Claude-style habits, plus em dashes or \"genuinely\", which older Claude versions used far more than Opus 5.5." : "Claude-style habits with almost no em dashes, which fits Opus 5.5.";
+    // v11: the recent-Claude model decides "recent"; without it, only old-version markers can give a version
+    const specP = r.model && r.model.spec ? (r.model.spec.find(s => s.name === "claude-modern") || {}).p : null;
+    const recent = specP != null ? specP >= 0.5 : !old;
+    name = recent ? "Claude Opus 5.5 (or another recent Claude)" : old ? "Claude (older version, like Opus 5 or Sonnet)" : "Claude (version unclear, possibly older)";
+    version = recent ? "claude-opus-5.5" : "claude-old";
+    why = recent ? "Claude-style writing that also matches the model trained on recent Claude (Opus 5.5) text." : old ? "Claude-style habits, plus em dashes or \"genuinely\", which older Claude versions used far more than Opus 5.5." : "Claude-style writing that doesn't match recent Claude (Opus 5.5) closely, so it may be an older version.";
   } else if (lean === "chatgpt") {
     if (/\bmay provide\b|\bnot necessarily\b|\bdoes not establish\b/.test(lower)) { name = "ChatGPT (GPT-5 / GPT-6 era)"; version = "gpt-new"; why = "ChatGPT-style habits plus hedges like \"may provide\" and \"not necessarily\" that newer GPT models overuse."; }
     else if (/\bdelv(?:e|es|ing)\b|\btapestry\b|\bin today's (?:fast-paced|digital)\b|\btestament to\b/.test(lower)) { name = "ChatGPT (older, GPT-4-style)"; version = "gpt-old"; why = "ChatGPT-style habits plus words like \"delve\" and \"tapestry\" from the GPT-4 era."; }
@@ -482,8 +485,9 @@ function suspect(text, r, a) {
   const SHORT = { "claude-old": "older Claude", "claude-opus-5.5": "Claude Opus 5.5", "gpt-new": "ChatGPT (GPT-5/6)", "gpt-old": "ChatGPT (GPT-4 style)", gpt: "ChatGPT-like" };
   const edNote = c.edited === 1 ? ` A few signs of edited AI were found (${c.edHumanEv.concat(c.edSkelEv).join(", ")}), but not enough to suspect it.` : "";
   // the trained recent-Claude specialist (v10) fired
-  if (!name && r.specialist) { name = "Claude Opus 5.5 (or another recent Claude)"; version = "claude-opus-5.5"; why = "The model trained on recent Claude writing matched this text, although the word-level Claude clues are weak."; }
-  if (!looksAI && !maybeAI) return { short: "none", label: "No AI suspected", detail: (name ? `Few AI habits overall. If AI was used, the closest match is ${name}.` : "Few AI habits, and no model-specific clues.") + edNote, version: "none", confidence: "none" };
+  if (!name && r.specialist && r.specialist.name === "claude-modern") { name = "Claude Opus 5.5 (or another recent Claude)"; version = "claude-opus-5.5"; why = "The model trained on recent Claude writing matched this text, although the word-level Claude clues are weak."; }
+  if (r.specialist && r.specialist.name === "humaniser") { name = (name ? name + ", then " : "An AI model, then ") + "run through a humaniser tool"; version = version || "gpt"; why = "The model trained on AI text rewritten by humaniser tools matched this text. " + why; }
+  if (!looksAI && !maybeAI) return { short: "none", label: "No AI suspected", detail: "The text looks like human writing, so there's no AI to name." + edNote, version: "none", confidence: "none" };
   if (!name) return { short: looksAI ? "AI, unclear which" : "can't tell", label: looksAI ? "An AI model, but it's not clear which" : "Can't tell", detail: looksAI ? "Many AI habits, but no clear Claude or ChatGPT clues. It could be another model, or edited text." : r.band === "mixed" ? "Part of the text shows many AI habits, but there aren't enough model-specific clues to say which AI." : "Not enough evidence of AI, and no model stands out.", version: "unknown", confidence: "none" };
   return { short: SHORT[version], label: name, detail: why + (looksAI ? "" : " The overall score is inconclusive, so this is only a possibility."), version, confidence: looksAI ? a.confidence : "low" };
 }

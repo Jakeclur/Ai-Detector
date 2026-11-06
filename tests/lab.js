@@ -20,7 +20,7 @@ for (const blk of raw.split(/\n\s*-{3,}\s*\n/)) {
   const text = E.cleanText(lines.join("\n")).text;
   const r = ENS.assess(text);
   if (r.tooShort) { rows.push({ label, wc: r.wc, short: true }); continue; }
-  const a = E.attribute(r.text, r);
+  const a = r.attr;   // trained attribution (with rule clues as evidence)
   const flagged = cut === "auto" ? r.band === "ai" : r.score >= cut;
   const isAI = !["Human", "Unlabelled"].includes(label);
   const det = label === "Unlabelled" ? "" : (isAI ? flagged : !flagged) ? "ok" : "WRONG";
