@@ -119,6 +119,7 @@ The weights were set by hand from the research, then checked against a labelled 
 | **Measured AI words** | *delve, showcasing, underscores, tapestry, intricate, meticulous, dependable, steady, thoughtful, solace, newfound…* | Each word counts at most twice, and everyday words like "essential" or "unique" count half, because students use them too. Only words that studies **measured** against human writing: Kobak et al. (15M abstracts), Reinhart et al., and Graphite (Opus 5.5 uses "dependable" 23× the human rate). Blog-list favourites were cut, because Originality.ai found many (e.g. "delve") were rare in real ChatGPT output |
 | **Stock phrases** | "plays a crucial role", "it's important to note", "This matters" (116×), "Why X matters" (92×), "Looking ahead" (40×), "adds another layer" (27×), "rather than simply" (32×), "is more than a X, it…" (98×) | Wikipedia's *Signs of AI writing*; Graphite 2026 study of Opus 5.5 |
 | **Opus 5.5 answer shape** | 5 habits: label-style paragraphs ("Storage. Solar produces nothing at night…"), a colon line then a plain list, a one-sentence opening answer, "that's why", "the good news is" / "depends mostly on". Counts lightly for 2, strongly for 3+ | Measured on 26 real Opus 5.5 answers written for this project vs 2,281 human texts: 3+ together never appeared in human writing |
+| **Edited-AI check** | 2+ casual touches (casual words, dropped apostrophes, a personal story dropped in) **and** 2+ leftover AI skeleton signs (textbook definition opening, "there are three main causes", "that's why", "good side / bad side" layout, an answer-shape habit, AI words). Moves a human-leaning result to **"Inconclusive: possibly edited AI"** (score at least 45), never to AI-leaning | Designed for AI text a person has "humanised". 6 of 15 edited Opus 5.5 answers vs 1 of 2,281 human texts |
 | **Fiction clichés** | "for a long moment", "said quietly", "felt something shift", "paused", "stared", "in that moment", "weathered hands" | Pangram found these rose sharply in Opus 5.5 stories |
 | **Tidy hopeful ending** | Stories (text with dialogue or fiction clichés) that end on "smiled", "for the first time", "hope", "together"… | Pangram: Opus 5.5 stories lean towards hope, resilience and family |
 | **Email boilerplate** | "I hope this email finds you well", "I wanted to follow up", "Please don't hesitate to reach out", "Thank you for your time and consideration" | Common AI email openers and closers. Each counts only a little, more when an opener and closer appear together |
@@ -201,7 +202,7 @@ On the half kept back for checking: humans wrongly flagged 6 → 3 (of 1,007), A
 |---|---|---|---|
 | Opus 5.5, tuning (26) | 0 | **6** | 32 (v5: 18) |
 | Opus 5.5, kept back (14) | 0 | **2** | 28 (v5: 19) |
-| Human-refined Opus 5.5 (15) | 0 | 0 | 19 |
+| Human-refined Opus 5.5 (15) | 0 | 0 (v7: **6 labelled "possibly edited AI"**) | 19 (v7: 29) |
 
 - Every flagged Opus 5.5 answer got **Suspected AI: Claude Opus 5.5**. It never said ChatGPT for these.
 - What it catches: structured answers and explanations (vaccines, compound interest, study tips, renewable energy, inflation, Rome).
@@ -248,7 +249,8 @@ For comparison, Pangram, a commercial detector that runs a real AI model, report
 
 - **It misses most plain, edited or "humanised" AI text.** AI imitating a teen with lowercase starts and slang looks human to it.
 - **It's unreliable under about 150 words.**
-- **It misses most Claude Opus 5.5 text**: 8 of 40 real Opus 5.5 answers flagged, and none once a person has edited them.
+- **It misses most Claude Opus 5.5 text**: 8 of 40 real Opus 5.5 answers flagged. Once a person edits them, the best it can do is "Inconclusive: possibly edited AI" (6 of 15), and edited stories and essays usually get through.
+- **The edited-AI check can be wrong about casual students.** A real student explaining something in a casual voice, with a story about their family, can trigger it (1 of 2,281 human texts did). That's why it stops at "Inconclusive". The real human test texts include few casual school answers, so the true false-alarm rate for teenagers could be higher.
 - **It misses most real chatbot text**: about 3 in 4 in the real-world test, and almost all Claude stories and news.
 - **Accuracy on today's chatbots is unknown.** The real chatbot test text is from 2023.
 - **The model guess is weak**: right on the imitations, but it never recognised real 2023 Claude text.
@@ -342,6 +344,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v4 | Text cleaning (hidden characters, look-alike letters, quotes); 2026 evidence (Opus 5.5, GPT-5.x/6); version-aware weights; structure clues (closers, hedging, vague attributions, praise words, colons, specifics, evenness); fiction, email and too-clean-casual clues; Claude vs ChatGPT attribution; inconclusive/mixed bands; sliding window; fairness cautions; Test lab tab |
 | v5 | Tested on real data (2,056 human and 1,800 ChatGPT/Claude texts from the Ghostbuster dataset). Fixed clues that wrongly flagged students and English learners ("I hope this helps" as a certain giveaway, "I think" as casual, hopeful endings in essays, lists of -ing words, repeated everyday words). Weights re-fitted (70% hand-set, 30% fitted). Humans flagged 19 → 10, real AI caught 23% → 25%. Added "Introduction:"-style labels and a few measured words. Fixed .docx error message and Test lab model check |
 | v6 | Studied 40 real Claude Opus 5.5 answers (v5 caught 0 of them). New "Opus 5.5 answer shape" clue (label-style paragraphs, colon lists, one-sentence openers, "that's why", "the good news is"); "if you paste…, I can…" offers. Opus 5.5 caught 0 → 8 of 40, with no extra humans flagged. New **Suspected AI** line on every result, with a version guess (Claude Opus 5.5, older Claude, ChatGPT GPT-5/6 or GPT-4-style). Single line breaks count as paragraphs when there are no blank lines. "Real Claude Opus 5.5 answer" sample button |
+| v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
 
 ---
 

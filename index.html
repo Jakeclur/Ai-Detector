@@ -158,6 +158,12 @@
 
       <div class="card caution hide" id="cautions"></div>
 
+      <div class="card hide" id="editCard">
+        <h2>Edited-AI check</h2>
+        <p class="h2note">AI text that someone has "humanised" usually keeps its AI skeleton underneath new casual touches. This looks for both together. It can only move a result to "Inconclusive", never to "AI-leaning".</p>
+        <div id="editBody"></div>
+      </div>
+
       <div class="card" id="attrCard">
         <h2>Which AI does it look more like?</h2>
         <div id="attr"></div>
@@ -270,7 +276,7 @@ a Claude answer goes here…</pre>
       <tr><td>Claude (2023): stories and news</td><td class="n">2%</td></tr>
     </table></div>
     <p>Compared with the previous version, this one wrongly flags about half as many people (10 instead of 19) and catches a few more chatbot texts (450 instead of 418), and it did better on both counts on the half that was kept back.</p>
-    <p><b>Real Claude Opus 5.5 answers.</b> 40 answers written by Claude Opus 5.5 itself (explanations, advice, essays, stories, emails and "write like a teen" posts) were used to find its habits. Before this, the detector caught 0 of 40 and called every one human-leaning. Now it flags 6 of the 26 used for tuning and 2 of the 14 kept back, mostly structured answers and explanations. Stories, emails and essays from Opus 5.5 still mostly look human to it. When it does flag one, it names Claude Opus 5.5 as the suspected AI. Versions edited by a "student" (casual words, typos, personal details) were caught 0 of 15 times.</p>
+    <p><b>Real Claude Opus 5.5 answers.</b> 40 answers written by Claude Opus 5.5 itself (explanations, advice, essays, stories, emails and "write like a teen" posts) were used to find its habits. Before this, the detector caught 0 of 40 and called every one human-leaning. Now it flags 6 of the 26 used for tuning and 2 of the 14 kept back, mostly structured answers and explanations. Stories, emails and essays from Opus 5.5 still mostly look human to it. When it does flag one, it names Claude Opus 5.5 as the suspected AI. Versions edited by a "student" (casual words, typos, personal details) are never flagged as AI-leaning, but the new edited-AI check labels 6 of 15 "Inconclusive: possibly edited AI" (and 1 of 2,281 real human texts).</p>
     <p><b>Own test set</b> (newer chatbot styles, all written by Claude): 0 of 216 human passages flagged; AI caught: classic ChatGPT-style essays 100%, modern answers about 33%, stories about 25%, emails about 13%, AI told to sound like a teenager about 10%. Any text with leftover chatbot lines ("As an AI language model", "[Your Name]", citation codes) is nearly always caught.</p>
     <p><b>Big caveat:</b> the real chatbot text is from 2023 models, which write differently from today's. The newer-style samples were all written by one AI (Claude), and the "ChatGPT-style" ones are imitations. Use the Test lab with your own real examples to find out how it does for you.</p>
     <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. On real 2023 Claude essays it sometimes said "ChatGPT-leaning" and never "Claude-leaning", because its Claude clues come from 2026 Claude versions. Treat it as a hint.</p>
@@ -285,6 +291,7 @@ a Claude answer goes here…</pre>
       <li><b>Measured words only.</b> Words that studies counted as over-used against human writing: <i>delve</i>, <i>showcasing</i>, <i>underscores</i> (15 million science abstracts), and <i>dependable</i> (23× the human rate), <i>steady</i> and <i>thoughtful</i> for Claude Opus 5.5 (Graphite, 2026). Many words from blog lists were dropped: Originality.ai checked 10 million words of ChatGPT output and found favourites like "delve" were actually rare.</li>
       <li><b>Structure.</b> Sentence length and spread, bullet/heading/bold density, paragraph evenness, "In short"-style closers, "not X, it's Y" contrasts, rule-of-three lists, trailing ", highlighting…" clauses (2–5× more common in AI), hedging, vague attributions ("experts suggest"), generic praise words, colons, and a lack of concrete names and numbers. The absence-type clues count only a little.</li>
       <li><b>Opus 5.5 answer shape.</b> Found by studying real Claude Opus 5.5 answers: paragraphs that start with a short label and a full stop ("Storage. Solar produces nothing at night…"), a colon line followed by a plain list, a one-sentence opening answer, "that's why", and "the good news is" / "depends mostly on". One of these alone is normal in human writing, so it counts only when three or more appear together, which never happened in 2,281 human texts.</li>
+      <li><b>Edited-AI check.</b> AI text that a person has "humanised" keeps its skeleton: a textbook definition opening, "there are three main causes", "that's why", a tidy "good side / bad side" layout. Edits add casual touches on top: casual words, dropped apostrophes, a personal story dropped into an explanation. When there are at least two of each, the result becomes "Inconclusive: possibly edited AI". It never makes a result AI-leaning, because students writing casually can look like this too.</li>
       <li><b>Fiction and email habits.</b> "For a long moment", "said quietly", "felt something shift", tidy hopeful endings, and email boilerplate such as "I hope this email finds you well" plus "Please don't hesitate to reach out".</li>
       <li><b>Too-clean casual text.</b> Text that sounds casual ("honestly", "kind of") but has no slips at all, even sentences and a neat moral at the end. Real people writing carefully can look like this, so it adds only a moderate amount and never decides the result alone.</li>
       <li><b>Version-aware clues.</b> Habits change between model versions. Pangram found Claude Opus 5.5 says "genuinely" 83% less than Opus 5, says "in short" 11× more, uses about 85% more bullets, and writes shorter, more even sentences. Em dashes almost vanished in Opus 5.5 but are still common in some GPT-5 output. So em dashes and "genuinely" now count for very little.</li>
@@ -303,7 +310,7 @@ a Claude answer goes here…</pre>
 <script>
 // ==CORE==
 /* =====================================================================
-   AI Text Detector engine (v6). Rules only: no trained text model, no network.
+   AI Text Detector engine (v7). Rules only: no trained text model, no network.
    Evidence sources (see the page's "research" section):
    - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
    - Reinhart et al., PNAS 2025 (participial clauses etc.)
@@ -643,6 +650,26 @@ function features(text) {
   const shapeFrame = /\b(?:the good news is|the (?:downside|upside|trade-off|tradeoff|catch) is|a (?:simple|quick|handy|good|easy) (?:way|rule|shortcut|plan|test)\b[^.\n]{0,30}:|depends (?:mostly |largely |mainly )?on\b)/i.test(text) ? 1 : 0;
   const shapeN = shapeLabel + shapeList + shapeOpener + shapeWhy + shapeFrame;
   const shape = shapeN >= 3 ? shapeN - 1 : shapeN === 2 ? 0.3 : 0;   // 2 habits: a nudge; 3+: strong
+  // ---- Edited-AI check ----
+  // AI text that a person has "humanised": an AI explanation skeleton under a casual surface.
+  // Measured on 15 edited Opus 5.5 answers vs 2,281 human texts (tests/data/opus55/refined_*.txt).
+  const edHumanEv = [], edSkelEv = [];
+  if (/\b(?:heaps|tbh|lol|honestly|kind of|kinda|pretty (?:cool|much|good|bad|sure)|basically|super \w+|way (?:more|less|faster|cleaner|better|bigger)|ngl|i reckon)\b/.test(lower)) edHumanEv.push("casual words (\"heaps\", \"tbh\", \"basically\")");
+  if (/\b(?:thats|cant|dont|didnt|doesnt|isnt|wasnt|im|ive|theres|whats|wont|couldnt|wouldnt)\b/.test(lower)) edHumanEv.push("dropped apostrophes (\"thats\", \"cant\")");
+  if (/(?:^|[.!?]\s+)(?:my (?:mum|mom|dad|parents|little |big |older |younger )?(?:sister|brother|mum|mom|dad|parents|best friend|friend|teacher|nan|grandma|family)\b|we went to|at my (?:old )?school|in our (?:prac|class|lesson)|on our (?:year \d+ )?(?:camp|excursion|trip))/.test(lower)) edHumanEv.push("a personal story dropped into an explanation");
+  const SKEL = [
+    [/\b(?:there(?:'?s| is| are| were)?|by|into|of) (?:two|three|four|five|a few|several|different) (?:(?:main|key|big|different|long[ -]term|short[ -]term|important) ){0,2}(?:stages|causes|reasons|types|ways|kinds|parts|steps|factors|sizes|options|things|problems|sides)\b/gi, "\"there are three main causes\"-style list"],
+    [/\b(?:which|that)(?:'?s| is) (?:also )?why\b/gi, "\"that's why\""],
+    [/\b(?:on the (?:positive|plus|good) side|a good thing about|the (?:main|biggest|strongest) (?:reason|argument|thing)|the (?:downside|upside|catch|trade-off) is|but there are (?:bad|real|some) (?:sides|downsides)|has good and bad sides|but there (?:were|was|are|is) (?:also )?(?:bad|good|darker|negative|positive|real) (?:parts|sides?|things|effects)|if you(?:'?re| are) (?:not sure|unsure|still not sure))\b/gi, "balanced \"good side / bad side\" or decision-rule framing"]
+  ];
+  for (const [re, label] of SKEL) { let hit = false; scan(re, m => { hit = true; add(m.index, m.index + m[0].length, "struct", "leftover AI structure (" + label + ")"); }); if (hit) edSkelEv.push(label); }
+  const firstSent = (text.trim().split(/(?<=[.!?])\s/)[0] || "");
+  if (/^[A-Z][\w' -]{2,40} (?:is|are|means) (?:when|how|somewhere|something|the (?:process|idea|way)|a |an |what )/.test(firstSent)) edSkelEv.push("opens with a textbook definition");
+  if (shapeN >= 1) edSkelEv.push("an Opus 5.5 answer-shape habit");
+  if (vocabN + phraseN >= 1) edSkelEv.push("AI-favoured words or stock phrases");
+  const edNarr = (lower.match(/\b(?:i|we|he|she) (?:was|were|had|said|went|looked|saw|got)\b/g) || []).length >= 3;
+  const edH = edHumanEv.length, edS = edSkelEv.length;
+  const edited = edNarr ? 0 : edH >= 2 && edS >= 2 ? 2 : (edH >= 2 && edS >= 1) || (edH >= 1 && edS >= 3) ? 1 : 0;
   const tooClean = (casualStrong + slang >= 2 || (contr >= 4 && casualStrong + slang >= 1)) && slipsN === 0 && lens.length >= 6 && cv < 0.55 && (wrap || hopeEnd) ? 1 : 0;
 
   return {
@@ -657,7 +684,8 @@ function features(text) {
       bullets, headings, bolds, boldLabels, emoji, listShare, sentences: lens.length, avgLen, cv, paraCv, paras: paras.length, minLen: lens.length ? Math.min(...lens) : 0,
       maxLen: lens.length ? Math.max(...lens) : 0, slips: slipsN, casual, contr, specifics, digits, names, quotes, wrap, excl,
       spacedDash: (text.match(/\s—\s/g) || []).length, tightDash: (text.match(/\w—\w/g) || []).length,
-      shapeN, shapeLabel, shapeList, shapeOpener, shapeWhy, shapeFrame, labels: labels.length
+      shapeN, shapeLabel, shapeList, shapeOpener, shapeWhy, shapeFrame, labels: labels.length,
+      edited, edHumanEv, edSkelEv
     }
   };
 }
@@ -697,7 +725,10 @@ function analyze(text, opts = {}) {
   for (const h of hs) if (h.start >= last) { clean.push(h); last = h.end; }
   let band = score < BANDS.human ? "human" : score < BANDS.ai ? "inconclusive" : "ai";
   if (F.counts.hard && score >= 45) band = "ai";
-  return { score, band, f: F.f, counts: F.counts, contrib, hits: clean, wc, conf };
+  // strong edited-AI signs lift a human-leaning text into the inconclusive range (never to AI-leaning)
+  let finalScore = score;
+  if (F.counts.edited === 2 && band !== "ai") { finalScore = Math.max(score, 45); band = "edited"; }
+  return { score: finalScore, rawScore: score, band, f: F.f, counts: F.counts, contrib, hits: clean, wc, conf };
 }
 
 // ---------- 6. Claude vs ChatGPT attribution ----------
@@ -736,6 +767,10 @@ function attribute(text, r) {
 function suspect(text, r, a) {
   const c = r.counts, lower = text.toLowerCase();
   const dashRate = r.wc ? c.dashes / r.wc * 1000 : 0;
+  if (c.edited === 2 && r.score < 55 && !c.hard) {
+    const who = a.lean === "claude" || c.shapeN >= 1 ? "The leftover structure looks most like Claude (Opus 5.5)." : a.lean === "chatgpt" ? "The leftover structure looks most like ChatGPT." : "Not enough clues to say which AI.";
+    return { short: "edited AI?", label: "Possibly AI that a person has edited", detail: `Casual touches sit on top of an AI-style explanation skeleton (see the edited-AI check). ${who} Students writing casually can also look like this, so treat it as a reason to ask questions, not as proof.`, version: "edited", confidence: "low" };
+  }
   const looksAI = r.score >= 55 || c.hard > 0;
   const maybeAI = r.score >= 35 || r.band === "mixed";
   const lean = a.lean;
@@ -751,7 +786,8 @@ function suspect(text, r, a) {
     else { name = "ChatGPT, or a model that writes like it (Gemini, Grok, DeepSeek…)"; version = "gpt"; why = "ChatGPT-style habits. Many other models write the same way."; }
   }
   const SHORT = { "claude-old": "older Claude", "claude-opus-5.5": "Claude Opus 5.5", "gpt-new": "ChatGPT (GPT-5/6)", "gpt-old": "ChatGPT (GPT-4 style)", gpt: "ChatGPT-like" };
-  if (!looksAI && !maybeAI) return { short: "none", label: "No AI suspected", detail: name ? `Few AI habits overall. If AI was used, the closest match is ${name}.` : "Few AI habits, and no model-specific clues.", version: "none", confidence: "none" };
+  const edNote = c.edited === 1 ? ` A few signs of edited AI were found (${c.edHumanEv.concat(c.edSkelEv).join(", ")}), but not enough to suspect it.` : "";
+  if (!looksAI && !maybeAI) return { short: "none", label: "No AI suspected", detail: (name ? `Few AI habits overall. If AI was used, the closest match is ${name}.` : "Few AI habits, and no model-specific clues.") + edNote, version: "none", confidence: "none" };
   if (!name) return { short: looksAI ? "AI, unclear which" : "can't tell", label: looksAI ? "An AI model, but it's not clear which" : "Can't tell", detail: looksAI ? "Many AI habits, but no clear Claude or ChatGPT clues. It could be another model, or edited text." : r.band === "mixed" ? "Part of the text shows many AI habits, but there aren't enough model-specific clues to say which AI." : "Not enough evidence of AI, and no model stands out.", version: "unknown", confidence: "none" };
   return { short: SHORT[version], label: name, detail: why + (looksAI ? "" : " The overall score is inconclusive, so this is only a possibility."), version, confidence: looksAI ? a.confidence : "low" };
 }
@@ -796,6 +832,7 @@ function cautions(r) {
   if (c.contr === 0 && c.casual === 0 && c.avgLen >= 17 && r.wc >= 100) out.push("This is formal writing. Careful, formal human writing (essays, reports, documentation) shares some habits with AI, so give this score less weight.");
   if (c.sentences >= 5 && c.avgLen <= 10 && c.slips === 0) out.push("This writing is very plain and simple. Plain writing, including writing by people using English as a second language, is often wrongly flagged by detectors. This tool doesn't score vocabulary or word length, but treat the result with extra caution.");
   if (c.listShare >= 0.3) out.push("This text is mostly a list. Notes, instructions and slides written by people are often list-heavy too, so formatting clues count for less here.");
+  if (c.edited === 2) out.push("Possible edited AI: this text mixes casual touches with an AI-style explanation skeleton. Real students writing a school answer in a casual voice can look like this too, so this alone never makes the result AI-leaning.");
   if (r.wc < 150) out.push("This is a short text. Under about 150 words there isn't much evidence either way, so the score has been pulled towards the middle.");
   return out;
 }
@@ -940,6 +977,7 @@ if (typeof document !== "undefined") {
   const BAND_TEXT = {
     human: ["Human-leaning", "human", "Few known AI habits. AI text written in a plain or casual style can still score this low, so this isn't proof a person wrote it."],
     inconclusive: ["Inconclusive", "mixed", "Not enough evidence either way. Plenty of human writing and plenty of lightly edited AI writing land here."],
+    edited: ["Inconclusive: possibly edited AI", "mixed", "Few obvious AI habits, but casual touches sit on top of an AI-style explanation skeleton, which is what AI text looks like after someone edits it. People writing casually can look like this too. See the edited-AI check below."],
     mixed: ["Mixed: part of it stands out", "mixed", "Most of the text looks human-leaning, but at least one stretch shows many AI habits. See the section scan and the shaded sentences below."],
     ai: ["AI-leaning", "ai", "Many habits that chatbots overuse. That's a reason to look closer, not proof."]
   };
@@ -972,6 +1010,7 @@ if (typeof document !== "undefined") {
       { v: k.lowSpec, t: "Few concrete specifics", d: `Few names, numbers or quotes (${c.specifics.toFixed(1)} per 100 words). Generic writing is a mild AI sign.` },
       { v: k.even, t: "Overly even tone", d: `Sentence lengths${c.paras >= 3 ? " and paragraph lengths" : ""} are very uniform, with no exclamations or questions.` },
       { v: k.shape, t: "Opus 5.5 answer shape", d: `${c.shapeN} of 5 habits found in real Claude Opus 5.5 answers: ${[c.shapeLabel && "label-style paragraphs (\"Storage. Solar produces…\")", c.shapeList && "a colon line then a plain list", c.shapeOpener && "a one-sentence opening answer", c.shapeWhy && "\"that's why\"", c.shapeFrame && "\"the good news is\" / \"depends on\""].filter(Boolean).join(", ")}. One alone is normal in human writing; three or more never appeared in 2,281 human texts.` },
+      { v: r.band === "edited" && r.rawScore < r.score ? 0.8 : 0, t: "Edited-AI check", d: `Casual touches on top of an AI-style skeleton raised the score from ${r.rawScore} to ${r.score} (the inconclusive range). This check can never make a result AI-leaning.` },
       { v: k.tooClean, t: "Casual but too clean", d: "Sounds casual, yet has no slips at all, even rhythm and a neat moral or generic ending." },
       { v: k.wrap, t: "Neat moral ending", d: "The last sentence wraps things up in a stock way." },
       { v: rhythm, t: "Sentence rhythm", d: `${c.sentences} sentences, ${c.minLen}–${c.maxLen} words (average ${c.avgLen.toFixed(0)}, spread ${c.cv.toFixed(2)}). ${rhythm < -0.15 ? "Lengths vary a lot, which is more typical of people." : "Fairly even lengths."}` },
@@ -992,7 +1031,7 @@ if (typeof document !== "undefined") {
       : a.lean === "claude" ? "Based mostly on habits of recent Claude versions (Opus 5.5, Sonnet 5). Older and future versions write differently."
       : total < 2 ? "Too few model-specific clues. The text could come from any model, or from a person." : "Clues point both ways. It could be either, another model, or edited text.";
     $("attr").innerHTML = `<div class="verdict" style="color:${head[1]}">${head[0]}${a.confidence !== "none" ? ` <span class="pill">${a.confidence} confidence</span>` : ""}</div>
-      ${r.suspect && r.suspect.version !== "unknown" && r.suspect.version !== "none" ? `<div class="note">Best version guess: ${escH(r.suspect.label)}</div>` : ""}
+      ${r.suspect && !["unknown", "none", "edited"].includes(r.suspect.version) ? `<div class="note">Best version guess: ${escH(r.suspect.label)}</div>` : ""}
       <div class="tug"><div class="marker" style="left:${pos}%"></div></div><div class="tug-lbl"><span>Claude</span><span>ChatGPT</span></div>
       <p class="note" style="margin:8px 0 0">${escH(note)} This guess has only been checked on a handful of sample passages, so treat it as a hint.</p>
       <div class="attr">
@@ -1062,6 +1101,14 @@ if (typeof document !== "undefined") {
     if (r.cautions.length) $("cautions").innerHTML = `<h2>Read the score with care</h2><ul class="diffs">${r.cautions.map(c => `<li>${escH(c)}</li>`).join("")}</ul>`;
 
     renderAttr(r);
+
+    const ce = r.counts;
+    $("editCard").classList.toggle("hide", !ce.edited && !(ce.edHumanEv.length && ce.edSkelEv.length));
+    const lvl = ce.edited === 2 ? "Several signs of edited AI" : ce.edited === 1 ? "A few signs of edited AI (not enough to suspect it)" : "Hardly any signs of edited AI";
+    $("editBody").innerHTML = `<div class="verdict" style="color:var(--${ce.edited === 2 ? "mixed" : "muted"})">${lvl}</div>
+      <div class="attr"><div class="side"><b>Casual touches</b>${ce.edHumanEv.length ? `<ul>${ce.edHumanEv.map(x => `<li>${escH(x)}</li>`).join("")}</ul>` : `<span class="none">None found</span>`}</div>
+      <div class="side"><b>Leftover AI skeleton</b>${ce.edSkelEv.length ? `<ul>${ce.edSkelEv.map(x => `<li>${escH(x)}</li>`).join("")}</ul>` : `<span class="none">None found</span>`}</div></div>
+      <p class="note" style="margin:8px 0 0">In testing, "several signs" showed up in 6 of 15 edited Claude Opus 5.5 answers and 1 of 2,281 real human texts. Stories and essays rewritten by a person are rarely caught.</p>`;
 
     const rows = describe(r).filter(s => Math.abs(s.v || 0) > 0.02).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
     const max = Math.max(1.5, ...rows.map(s => Math.abs(s.v)));
