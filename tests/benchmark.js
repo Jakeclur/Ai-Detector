@@ -120,6 +120,18 @@ function main() {
   const bySrc = {};
   for (const r of rows.filter(r => !r.y && r.d.condition === "original")) { const k = r.d.source; bySrc[k] = bySrc[k] || { n: 0, v9: 0, v10: 0 }; bySrc[k].n++; if (r.v9.flag) bySrc[k].v9++; if (r.v10.flag) bySrc[k].v10++; }
   report.humanFalsePositives = bySrc;
+  // robustness: the same human texts reformatted (short lines removed + blank-line paragraphs, or all on one line)
+  const fmtVariants = { noShortLines: t => t.split("\n").filter(p => C.nWords(p) >= 25).join("\n\n"), oneParagraph: t => t.replace(/\s*\n\s*/g, " ") };
+  report.reformatted = {};
+  for (const [vn, fv] of Object.entries(fmtVariants)) {
+    let n = 0, f9 = 0, f10 = 0;
+    for (const r of rows.filter(r => !r.y && r.d.condition === "original")) {
+      const t = fv(r.d.text); if (C.nWords(t) < 40) continue; n++;
+      const a = C.analyze(C.cleanText(t).text); if (a.score >= C.BANDS.ai || a.band === "ai") f9++;
+      if (ENS.assess(t, { noCache: true }).band === "ai") f10++;
+    }
+    report.reformatted[vn] = { n, v9: f9, v10: f10 };
+  }
   const mixed = mixedDocs(); let m9 = 0, m10 = 0, h9 = 0, h10 = 0;
   for (const m of mixed) { const a = mixedResult(m.mixed), b = mixedResult(m.human); if (a.v9) m9++; if (a.v10) m10++; if (b.v9) h9++; if (b.v10) h10++; }
   report.mixed = { n: mixed.length, flagged_v9: m9, flagged_v10: m10, same_essay_without_ai_paragraph_v9: h9, same_essay_without_ai_paragraph_v10: h10 };
@@ -144,6 +156,7 @@ function main() {
   for (const s of report.slices) console.log(`${s.name.slice(0, 62).padEnd(62)} v9 rec ${f(s.v9.recall).padStart(6)} FPR ${f(s.v9.fpr, 2).padStart(6)} AUC ${a(s.v9.roc_auc)} | v10 rec ${f(s.v10.recall).padStart(6)} FPR ${f(s.v10.fpr, 2).padStart(6)} AUC ${a(s.v10.roc_auc)}`);
   console.log("human false positives by source:", Object.entries(bySrc).map(([k, v]) => `${k.replace("ghostbuster/", "")} ${v.v9}→${v.v10}/${v.n}`).join(", "));
   console.log("mixed:", report.mixed);
+  console.log("reformatted human texts flagged:", JSON.stringify(report.reformatted));
   for (const [k, o] of Object.entries(at)) console.log(`attribution ${k.padEnd(40)} n ${String(o.n).padStart(5)} | v9 right ${f(o.v9.right / o.n)} wrong ${f(o.v9.wrong / o.n)} | v11 right ${f(o.v10.right / o.n)} wrong ${f(o.v10.wrong / o.n)}`);
 }
 
@@ -179,6 +192,7 @@ th{color:var(--muted);font-weight:600}.n{text-align:right;font-variant-numeric:t
 ${row("<b>Overall</b> (original, prompt variants, humaniser)", O)}${R.slices.map(s => row(s.name, s)).join("")}</table></div>
 <div class="card"><h2>Human false positives by source</h2><div class="wrap"><table><tr><th>Source</th><th class="n">Texts</th><th class="n">v9 flagged</th><th class="n">v10 flagged</th></tr>
 ${Object.entries(R.humanFalsePositives).map(([k, v]) => `<tr><td>${k}</td><td class="n">${v.n}</td><td class="n">${v.v9}</td><td class="n ${cls(v.v10, v.v9, true)}">${v.v10}</td></tr>`).join("")}</table></div></div>
+<div class="card"><h2>Reformatted human texts</h2><p>The same held-out human texts with short lines removed (blank-line paragraphs), or squashed into one paragraph. Wrongly flagged: ${Object.entries(R.reformatted || {}).map(([k, v]) => `${k}: v9 ${v.v9}, current ${v.v10} of ${v.n}`).join("; ")}.</p></div>
 <div class="card"><h2>Which AI? (Claude vs ChatGPT attribution)</h2><div class="wrap"><table><tr><th>AI texts</th><th class="n">Texts</th><th class="n">Right v9</th><th class="n">v11</th><th class="n">Wrong v9</th><th class="n">v11</th><th class="n">Can't tell v9</th><th class="n">v11</th></tr>
 ${Object.entries(R.attribution || {}).map(([k, o]) => `<tr><td>${k}</td><td class="n">${o.n}</td><td class="n">${f(o.v9.right / o.n)}</td><td class="n ${cls(o.v10.right / o.n, o.v9.right / o.n)}">${f(o.v10.right / o.n)}</td><td class="n">${f(o.v9.wrong / o.n)}</td><td class="n ${cls(o.v10.wrong / o.n, o.v9.wrong / o.n, true)}">${f(o.v10.wrong / o.n)}</td><td class="n">${f(o.v9.unclear / o.n)}</td><td class="n">${f(o.v10.unclear / o.n)}</td></tr>`).join("")}</table></div>
 <p class="muted">Counted on AI texts that v11 did not call "likely human" (it doesn't name a model for those). "chatgpt-imitation" texts were written by Claude imitating ChatGPT, so "Claude" is arguably the right answer for them.</p></div>

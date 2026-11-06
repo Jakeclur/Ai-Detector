@@ -199,6 +199,24 @@ Each family has its own fingerprint clues. The detector adds them up and shows a
 
 ## How accurate is it?
 
+### v12 (current): character patterns, stricter cut-off
+v12 adds 512 hashed character-pattern features (three-character sequences such as "ing", "tio" and ", t"), which capture spelling, morphology and punctuation habits. In a matched test with zero held-out humans flagged, they raised AI caught from 81.9% to 85.6% (humaniser text 46% → 67%).
+
+The released model uses a stricter cut-off (the 99.9th percentile of human scores). At the 99.8th percentile, v12 flagged one more reformatted human essay than v11, and that's not allowed.
+
+| Held-out | v11 | v12 |
+|---|---|---|
+| Humans wrongly flagged (2,339) | 2 | 2 |
+| … same texts with short lines removed / on one line | 3 | **2** |
+| Humans landing in "inconclusive" | 3.5% | **2.8%** |
+| AI caught, overall | 83.3% | 82.3% |
+| Sentence-level rewording / edits | 53% / 49% | **57% / 57%** |
+| Claude Opus 5.5 / edited Opus | 36% / 40% | 36% / 40% |
+| Stories / Claude (2023) | 63% / 57% | 60% / 54% |
+| ROC-AUC | 0.995 | **0.996** |
+
+So v12 trades about 1 point of overall recall for fewer people flagged or left in the grey zone, and for better resistance to rewording. The owner's essay scores 49, "Likely human-written", just under the 50 line.
+
 ### v11: held-out benchmark (`node tests/benchmark.js`, dashboard in `docs/benchmark.html`)
 Test half only: 2,339 human and 6,428 AI texts, split by prompt group, with 610 near-copies of training documents skipped.
 
@@ -514,6 +532,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
 | v8 | Tested with a real student's English essay (thanks to the owner). It scored 28, "Human-leaning", but the old Mixed rule labelled it "Mixed", and the same rule hit 76 of 2,056 real human texts. **New Mixed rule:** one non-final paragraph 70+ and 40+ above the rest; shading now marks that whole paragraph. Humans labelled Mixed 76 → 6 of 2,262. Scores and AI-leaning results unchanged |
 | v9 | Bigger real-data test (5,303 human / 4,635 AI texts, incl. humaniser-tool output). In-text citations as a human sign; lone AI words count 40%; weights re-fitted; Mixed threshold 72. Humans flagged 33 → 15, AI caught 30% → 33%, with no human group getting worse |
+| v12 | Hashed character 3-gram features; trained genre classifier for the "type of writing" shown; stricter cut-offs (99.9th percentile); a reformatted-human-text robustness test in the benchmark. Held-out humans flagged 2 (reformatted versions 3 → 2), humans in "inconclusive" 3.5% → 2.8%, recall 83.3% → 82.3%, sentence-level rewording 53% → 57% |
 | v11 | Gradient-boosted trees blended with the logistic ensemble; trained Claude-vs-ChatGPT attribution (right 88–99% of the time when it names a model, vs 2–28% for the old clues); humaniser specialist; specialists need ≥5% support from the main model; "likely human" below 50; version hints from the recent-Claude model; 40 more Opus 5.5 samples. Held-out: humans flagged 3 → 2, recall 82.0% → 83.3%, Opus 5.5 29% → 36% (on a larger test set), edited Opus 0% → 40% |
 | v10 | **Rebuilt detection engine.** Statistical, structural and semantic feature extractors; a trained, calibrated logistic ensemble (7 bootstrap members) with fairness constraints; a recent-Claude specialist; genre-aware cut-offs; length shrinkage, chunked long documents and out-of-distribution checks; confidence and evidence quality; paragraph-by-paragraph model scores. New dataset layer with group splits and a near-duplicate leakage check, paraphrase and perturbation test sets, an import folder for new models, a full benchmark (accuracy, precision, recall, F1, FPR, FNR, ROC-AUC, PR-AUC, ECE) and dashboard, and 30 more Opus 5.5 samples. Held-out: recall 53% → 82%, humans flagged 0.38% → 0.13%, AUC 0.907 → 0.993 |
 

@@ -281,7 +281,8 @@ a Claude answer goes here…</pre>
 
   <details>
     <summary>How accurate is it?</summary>
-    <p><b>v11 (current).</b> Trained models combine the writing-habit clues with statistical, structural and semantic features. On held-out texts the models never saw (2,339 human, 6,428 AI):</p>
+    <p><b>v12 (current)</b> adds letter-and-punctuation pattern features and a stricter cut-off: compared with v11 it flags the same number of real people (and fewer when their text is reformatted), leaves fewer people in "inconclusive" (2.8%), and copes better with reworded sentences, while catching about 1 point less AI overall (82%). The v11 table:</p>
+    <p><b>v11.</b> Trained models combine the writing-habit clues with statistical, structural and semantic features. On held-out texts the models never saw (2,339 human, 6,428 AI):</p>
     <div class="tablewrap"><table>
       <tr><th>Kind of text</th><th class="n">v9</th><th class="n">v11</th></tr>
       <tr><td>Real human texts wrongly flagged</td><td class="n">9 (0.38%)</td><td class="n">2 (0.09%)</td></tr>

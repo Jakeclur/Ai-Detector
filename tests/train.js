@@ -248,8 +248,9 @@ if (require.main === module) {
   // people score above them. (A 99.3rd-percentile cut-off looked good on one held-out run but flagged 0.7% of humans
   // after retraining, as its percentile implies, so it was rejected.)
   // v12: + hashed character 3-grams (useChr). At zero held-out false positives they raised recall 81.9% -> 85.6%
-  // (humaniser text 46% -> 67%, Claude 2023 54% -> 64%, paraphrased 64% -> 70%).
-  const M = trainAll(rows, { useRules: true, useStyle: true, useVocab: true, useChr: true, modernWeight: 8, humanWeight: 2 }, { l2: 0.01, gbdt: true, hiPct: 0.998, genrePct: 0.999 });
+  // (humaniser text 46% -> 67%, Claude 2023 54% -> 64%, paraphrased 64% -> 70%). Cut-offs at the 99.9th / 99.95th
+  // percentile: at 99.8th the new model flagged one more reformatted human essay than v11, so it was made stricter.
+  const M = trainAll(rows, { useRules: true, useStyle: true, useVocab: true, useChr: true, modernWeight: 8, humanWeight: 2 }, { l2: 0.01, gbdt: true, hiPct: 0.999, genrePct: 0.9995 });
   const json = toJSON(M);
   // 2) specialist for recent Claude: Opus 5.5 texts vs all human texts, with a stricter cut-off.
   //    The general model is dominated by 2023 writing; this one only looks for what separates modern Claude.
