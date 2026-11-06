@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Text Detector</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f5f1; --card: #ffffff; --ink: #1c1c1a; --muted: #6b6a63; --line: #e3e1d9; --soft: #f0eee8;
+    --human: #2f7d5b; --mixed: #b7791f; --ai: #c0392b; --accent: #3b5bdb; --claude: #b85c38; --gpt: #1a7f6e;
+    --hl-word: #ffe58f; --hl-phrase: #ffc9a8; --hl-struct: #c7dbff; --hl-trans: #e3d0ff; --hl-hard: #ff9b9b; --tint: rgba(192, 57, 43, .09);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --card: #1d1d1b; --ink: #ecebe5; --muted: #9b9a90; --line: #33322e; --soft: #262522;
+      --human: #4fbf8f; --mixed: #e0a740; --ai: #ef6a5b; --accent: #7c93ff; --claude: #e08a63; --gpt: #3fc2a9;
+      --hl-word: #6b5612; --hl-phrase: #7a3d1c; --hl-struct: #233f78; --hl-trans: #4a2f75; --hl-hard: #8a2020; --tint: rgba(239, 106, 91, .13);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 28px 18px 60px; }
+  h1 { font-size: 1.75rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .warn { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--mixed); border-radius: 8px; padding: 12px 14px; font-size: .92rem; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .tab { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 9px 14px; font-weight: 600; color: var(--muted); }
+  .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+  .panel { display: none; } .panel.on { display: block; }
+  label.lbl { display: block; font-weight: 600; font-size: .92rem; margin: 6px 0 6px; }
+  textarea { width: 100%; min-height: 200px; resize: vertical; padding: 14px; font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #lab { min-height: 260px; font-size: .92rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 0; }
+  button { font: inherit; font-size: .93rem; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 13px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 8px 18px; }
+  button:hover { filter: brightness(0.95); }
+  .count { margin-left: auto; color: var(--muted); font-size: .88rem; }
+  .msg { color: var(--ai); margin-top: 10px; font-size: .93rem; }
+  .msg.info { color: var(--mixed); }
+  .hide { display: none !important; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .card.alert { border-left: 4px solid var(--ai); }
+  .card.caution { border-left: 4px solid var(--mixed); }
+  .card.notice { border-left: 4px solid var(--accent); font-size: .92rem; }
+  .score-line { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .score { font-size: 3.2rem; font-weight: 750; line-height: 1; min-width: 3ch; }
+  .verdict { font-size: 1.18rem; font-weight: 650; }
+  .note { color: var(--muted); font-size: .88rem; }
+  .meter { position: relative; height: 12px; border-radius: 6px; margin: 18px 0 6px; background: linear-gradient(90deg, var(--human) 0%, var(--human) 33%, var(--mixed) 35%, var(--mixed) 53%, var(--ai) 57%, var(--ai) 100%); }
+  .marker { position: absolute; top: -5px; width: 4px; height: 22px; background: var(--ink); border-radius: 2px; transform: translateX(-2px); transition: left .4s; }
+  .scale { display: grid; grid-template-columns: 35fr 20fr 45fr; color: var(--muted); font-size: .78rem; }
+  .scale span:nth-child(2) { text-align: center; } .scale span:nth-child(3) { text-align: right; }
+  .pill { display: inline-block; font-size: .78rem; padding: 2px 9px; border-radius: 99px; background: var(--soft); color: var(--muted); margin-top: 6px; }
+  h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  .h2note { color: var(--muted); font-size: .85rem; margin: 0 0 14px; }
+  .sig { display: grid; grid-template-columns: 1fr 150px; gap: 4px 16px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .sig:first-of-type { border-top: 0; }
+  .sig b { font-weight: 600; }
+  .sig .d { grid-column: 1; color: var(--muted); font-size: .86rem; }
+  .push { grid-column: 2; grid-row: 1 / span 2; align-self: center; position: relative; height: 10px; background: var(--soft); border-radius: 5px; }
+  .push::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+  .push i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+  .push-lbl { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); max-width: 150px; margin-left: auto; }
+  .none { color: var(--muted); font-size: .9rem; }
+  .attr { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+  .attr .side { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .attr .side b { display: block; margin-bottom: 4px; }
+  .attr ul { margin: 0; padding-left: 18px; font-size: .86rem; color: var(--muted); }
+  .tug { position: relative; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--claude), var(--soft) 45%, var(--soft) 55%, var(--gpt)); margin: 12px 0 4px; }
+  .tug .marker { top: -5px; }
+  .tug-lbl { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted); }
+  .strip { display: flex; gap: 3px; height: 26px; margin-bottom: 12px; }
+  .strip div { border-radius: 4px; min-width: 6px; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; color: #fff; }
+  .seg { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: start; padding: 8px 0; border-top: 1px solid var(--line); font-size: .9rem; }
+  .seg:first-of-type { border-top: 0; }
+  .badge { border-radius: 6px; text-align: center; font-weight: 700; color: #fff; padding: 2px 0; font-size: .85rem; }
+  #marked { white-space: pre-wrap; word-wrap: break-word; line-height: 1.75; }
+  .tint { background: var(--tint); box-shadow: 0 0 0 2px var(--tint); border-radius: 2px; }
+  mark { border-radius: 3px; padding: 1px 2px; color: inherit; cursor: help; }
+  mark.word { background: var(--hl-word); } mark.phrase { background: var(--hl-phrase); } mark.struct { background: var(--hl-struct); }
+  mark.trans { background: var(--hl-trans); } mark.hard { background: var(--hl-hard); font-weight: 600; }
+  .legend { color: var(--muted); font-size: .82rem; margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 680px) { .grid2, .attr { grid-template-columns: 1fr; } .sig { grid-template-columns: 1fr 100px; } }
+  ul.diffs { margin: 8px 0 0; padding-left: 20px; }
+  ul.diffs li { margin: 4px 0; font-size: .93rem; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p, details li { font-size: .92rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { color: var(--human); font-weight: 700; } .bad { color: var(--ai); font-weight: 700; }
+  .tablewrap { overflow-x: auto; }
+  input[type=range] { width: 160px; vertical-align: middle; }
+  code { font-size: .88em; background: var(--soft); padding: 1px 4px; border-radius: 4px; }
+  footer { color: var(--muted); font-size: .82rem; margin-top: 24px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>AI Text Detector</h1>
+  <p class="sub">See how many known AI-writing habits a text shows, which chatbot it looks more like, and where the AI-like parts are. You can also compare it with someone's known writing, or test the detector on your own examples.</p>
+
+  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In testing it flagged none of 216 human-written passages, but it caught only about half of the AI-written ones: AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="check">Check a text</button>
+    <button class="tab" data-tab="compare">Compare with known writing</button>
+    <button class="tab" data-tab="lab">Test lab</button>
+  </div>
+
+  <!-- ============ CHECK ============ -->
+  <section class="panel on" id="panel-check">
+    <textarea id="input" placeholder="Paste at least 40 words here, or upload a .txt or .docx file (150+ words gives a much more reliable result)…" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="primary" id="go">Analyse</button>
+      <button data-upload="input">Upload file</button>
+      <button id="clear">Clear</button>
+      <span class="count" id="count">0 words</span>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span class="note">Try a sample:</span>
+      <button data-sample="claude">Claude-style answer</button>
+      <button data-sample="chatgpt">ChatGPT-style answer</button>
+      <button data-sample="classic">Old ChatGPT essay</button>
+      <button data-sample="mixed">Human essay with a pasted AI paragraph</button>
+      <button data-sample="human">Human (1889 novel)</button>
+    </div>
+    <div class="msg" id="msg"></div>
+
+    <section id="result" class="hide" style="margin-top:22px">
+      <div class="card notice hide" id="cleanNote"></div>
+      <div class="card alert hide" id="giveaways"></div>
+
+      <div class="card">
+        <div class="score-line">
+          <div class="score" id="scoreNum">0</div>
+          <div style="flex:1;min-width:220px">
+            <div class="verdict" id="verdict"></div>
+            <div class="note" id="verdictNote"></div>
+            <span class="pill" id="confPill"></span>
+          </div>
+          <button id="copy">Copy summary</button>
+        </div>
+        <div class="meter"><div class="marker" id="marker" style="left:0%"></div></div>
+        <div class="scale"><span>0–34 human-leaning</span><span>35–54 inconclusive</span><span>55–100 AI-leaning</span></div>
+      </div>
+
+      <div class="card caution hide" id="cautions"></div>
+
+      <div class="card" id="attrCard">
+        <h2>Which AI does it look more like?</h2>
+        <div id="attr"></div>
+      </div>
+
+      <div class="card hide" id="segCard">
+        <h2>Section by section</h2>
+        <p class="h2note">Each part scored on its own. One part scoring much higher than the rest can mean text was pasted in from somewhere else. Short sections give less reliable scores.</p>
+        <div class="strip" id="strip"></div>
+        <div id="segs"></div>
+      </div>
+
+      <div class="card">
+        <h2>What affected the score</h2>
+        <p class="h2note">Bars to the right push the score up (more AI-like), bars to the left pull it down.</p>
+        <div id="signals"></div>
+      </div>
+
+      <div class="card">
+        <h2>Flagged text</h2>
+        <p class="h2note">Hover or tap a highlight to see why it was flagged. <span id="tintNote"></span></p>
+        <div id="marked"></div>
+        <div class="legend">
+          <span style="--c:var(--hl-hard)">certain giveaway</span>
+          <span style="--c:var(--hl-word)">AI-favoured word</span>
+          <span style="--c:var(--hl-phrase)">stock phrase / cliché</span>
+          <span style="--c:var(--hl-struct)">sentence pattern / formatting</span>
+          <span style="--c:var(--hl-trans)">formal transition</span>
+          <span style="--c:var(--tint)">part of an AI-like stretch</span>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ COMPARE ============ -->
+  <section class="panel" id="panel-compare">
+    <p class="note" style="margin-top:0">Paste something the person <b>definitely wrote themselves</b> (for example an in-class essay), then the text you're unsure about. This compares writing style: how often they use small words like "the", "but" and "really", plus sentence length, contractions and punctuation. It works best with 300+ words of each and the same kind of writing (two essays, not an essay and a text message).</p>
+    <div class="grid2">
+      <div>
+        <label class="lbl" for="known">1. Known writing by this person</label>
+        <textarea id="known" placeholder="Paste writing you know they did themselves…" spellcheck="false"></textarea>
+        <div class="row"><button data-upload="known">Upload file</button><span class="count" id="countK">0 words</span></div>
+      </div>
+      <div>
+        <label class="lbl" for="unknown">2. Text to check</label>
+        <textarea id="unknown" placeholder="Paste the text you're unsure about…" spellcheck="false"></textarea>
+        <div class="row"><button data-upload="unknown">Upload file</button><span class="count" id="countU">0 words</span></div>
+      </div>
+    </div>
+    <div class="row"><button class="primary" id="goCompare">Compare styles</button><button id="sampleCompare">Try an example</button></div>
+    <div class="msg" id="msgC"></div>
+    <section id="cresult" class="hide" style="margin-top:20px">
+      <div class="card">
+        <div class="verdict" id="cverdict"></div>
+        <div class="note" id="cnote" style="margin-top:4px"></div>
+        <ul class="diffs" id="cdiffs"></ul>
+      </div>
+      <div class="card">
+        <h2>AI habit score for each text</h2>
+        <p class="h2note">Scored separately with the main checker, for context.</p>
+        <div id="cscores"></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ TEST LAB ============ -->
+  <section class="panel" id="panel-lab">
+    <p class="note" style="margin-top:0">Paste several texts separated by a line containing only <code>---</code>. Put a label on the first line of each one: <code>Human</code>, <code>Claude</code> or <code>ChatGPT</code> (or <code>AI</code> for any other model). Then press Run to see how the detector does on your own examples.</p>
+<pre class="note" style="background:var(--soft);padding:10px 12px;border-radius:8px;margin:0 0 10px;white-space:pre-wrap">Human
+my own writing goes here…
+---
+ChatGPT
+a ChatGPT answer goes here…
+---
+Claude
+a Claude answer goes here…</pre>
+    <textarea id="lab" placeholder="Human&#10;paste text…&#10;---&#10;ChatGPT&#10;paste text…" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="primary" id="goLab">Run tests</button>
+      <button data-upload="lab">Upload .txt</button>
+      <button id="sampleLab">Load 20 sample passages</button>
+      <label class="note">AI cut-off: <input type="range" id="cut" min="35" max="80" step="1" value="55"> <b id="cutVal">55</b></label>
+      <span class="count" id="countL"></span>
+    </div>
+    <div class="msg" id="msgL"></div>
+    <section id="lresult" class="hide" style="margin-top:20px">
+      <div class="card" id="lsummary"></div>
+      <div class="card">
+        <div class="row" style="margin:0 0 6px"><h2 style="margin:0">Results</h2><button id="copyLab" style="margin-left:auto">Copy results</button></div>
+        <p class="h2note">"Detected?" means the score reached the AI cut-off. Texts in the inconclusive band count as not flagged. "Model?" is only checked for texts labelled Claude or ChatGPT.</p>
+        <div class="tablewrap"><table id="ltable"></table></div>
+      </div>
+    </section>
+  </section>
+
+  <input type="file" id="file" accept=".txt,.md,.docx,text/plain" class="hide">
+
+  <details>
+    <summary>How accurate is it?</summary>
+    <p><b>Detection.</b> I tested it on 216 human-written passages (programming documentation, package READMEs, Newton's <i>Opticks</i>, the GPL licence, classic novels and speeches) and 53 AI-written passages in five styles. Part of the AI set was kept back and only used for checking. Results at the 55 cut-off:</p>
+    <table>
+      <tr><th>Kind of text</th><th class="n">Flagged as AI</th></tr>
+      <tr><td>Human-written (216 passages, plus 9 everyday-style ones)</td><td class="n">0% (4% landed in "inconclusive")</td></tr>
+      <tr><td>AI, classic ChatGPT essay style</td><td class="n">100%</td></tr>
+      <tr><td>AI, modern chatbot answers</td><td class="n">about 55%</td></tr>
+      <tr><td>AI, short stories</td><td class="n">about 40%</td></tr>
+      <tr><td>AI, emails and posts</td><td class="n">about 15%</td></tr>
+      <tr><td>AI told to sound like a teenager</td><td class="n">about 10%</td></tr>
+      <tr><td>Any text with leftover chatbot lines ("I hope this helps", "[Your Name]", citation codes)</td><td class="n">nearly always</td></tr>
+    </table>
+    <p><b>Big caveat:</b> every AI passage was written by one AI (Claude), and the "ChatGPT-style" ones are imitations, not real ChatGPT output. The everyday "human" passages in the sample set were also written by Claude imitating people. The real human texts are mostly formal or old, with no genuine teenage or casual writing. Use the Test lab with real examples to find out how it does for you.</p>
+    <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. It never named the wrong one, but that's a tiny test on imitations, so treat it as a hint.</p>
+    <p><b>Mixed texts:</b> in a test essay made of three human paragraphs and one pasted AI paragraph, the whole essay scored 25 and was labelled "Mixed", while the AI paragraph's section scored 67 and the sliding window reached 76. No stretch of human text in the test set scored above 39.</p>
+    <p>Tools that run a real language model do much better. Pangram reports catching 99.7% of Claude Opus 5.5 answers. A page like this can't run such a model, and I haven't added one because I couldn't test it here.</p>
+  </details>
+
+  <details>
+    <summary>What it looks for, and the research behind it</summary>
+    <ul>
+      <li><b>Certain giveaways.</b> Lines a chatbot leaves behind when an answer is pasted unedited: "As an AI language model", "I hope this helps", "If you want, I can also…", "Would you like me to…", "[Your Name]", ChatGPT citation codes (<code>oaicite</code>, <code>utm_source=chatgpt.com</code>).</li>
+      <li><b>Measured words only.</b> Words that studies counted as over-used against human writing: <i>delve</i>, <i>showcasing</i>, <i>underscores</i> (15 million science abstracts), and <i>dependable</i> (23× the human rate), <i>steady</i> and <i>thoughtful</i> for Claude Opus 5.5 (Graphite, 2026). Many words from blog lists were dropped: Originality.ai checked 10 million words of ChatGPT output and found favourites like "delve" were actually rare.</li>
+      <li><b>Structure.</b> Sentence length and spread, bullet/heading/bold density, paragraph evenness, "In short"-style closers, "not X, it's Y" contrasts, rule-of-three lists, trailing ", highlighting…" clauses (2–5× more common in AI), hedging, vague attributions ("experts suggest"), generic praise words, colons, and a lack of concrete names and numbers. The absence-type clues count only a little.</li>
+      <li><b>Fiction and email habits.</b> "For a long moment", "said quietly", "felt something shift", tidy hopeful endings, and email boilerplate such as "I hope this email finds you well" plus "Please don't hesitate to reach out".</li>
+      <li><b>Too-clean casual text.</b> Text that sounds casual ("honestly", "kind of") but has no slips at all, even sentences and a neat moral at the end. Real people writing carefully can look like this, so it adds only a moderate amount and never decides the result alone.</li>
+      <li><b>Version-aware clues.</b> Habits change between model versions. Pangram found Claude Opus 5.5 says "genuinely" 83% less than Opus 5, says "in short" 11× more, uses about 85% more bullets, and writes shorter, more even sentences. Em dashes almost vanished in Opus 5.5 but are still common in some GPT-5 output. So em dashes and "genuinely" now count for very little.</li>
+      <li><b>Human signs.</b> Missing apostrophes ("dont"), lowercase "i", slang, "!!", and very uneven sentence lengths lower the score.</li>
+      <li><b>Text cleaning.</b> Invisible characters are removed, look-alike letters (for example a Cyrillic "о" hidden in an English word to fool detectors) are swapped back, and curly quotes are straightened before checking. You're told when this happens.</li>
+    </ul>
+    <p><b>Claude vs ChatGPT.</b> The "Idiosyncrasies in LLMs" study (ICML 2025) could tell ChatGPT, Claude, Grok, Gemini and DeepSeek apart 97% of the time with a trained model. It found ChatGPT bolds key points, titles answers with headers and favours "certainly", "such as" and "overall", while Claude uses plain lists, less bold, and phrases like "based on" and "here". Newer clues come from 2026 studies of Opus 5.5 and GPT-5.x/6. The study also found models trained on ChatGPT output write like ChatGPT, so an unknown model will often look ChatGPT-leaning.</p>
+    <p><b>Fairness.</b> A 2023 Stanford study found commercial detectors wrongly flagged 61% of essays by non-native English writers. This tool doesn't score vocabulary richness or word length, and it warns you when a text is formal, very plain or list-heavy. It only works on English.</p>
+    <p>Sources: <a href="https://www.pangram.com/blog/can-pangram-detect-opus-5-5">Pangram: Opus 5.5</a> · <a href="https://www.remio.ai/post/claude-opus-5-5-writing-tells-changed-but-they-did-not-disappear">Graphite study (via remio)</a> · <a href="https://arxiv.org/abs/2502.12150">Idiosyncrasies in LLMs</a> · <a href="https://originality.ai/blog/can-humans-detect-chatgpt">Originality.ai: common ChatGPT words</a> · <a href="https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing">Wikipedia: Signs of AI writing</a> · <a href="https://arxiv.org/abs/2406.07016">Kobak et al.</a> · <a href="https://arxiv.org/abs/2410.16107">Reinhart et al.</a> · <a href="https://arxiv.org/abs/2304.02819">Liang et al.</a></p>
+  </details>
+
+  <footer>Runs entirely in your browser. Your text is not sent anywhere.</footer>
+</main>
+
+<script>
+/*CORE*/
+
+if (typeof document !== "undefined") {
+  const $ = id => document.getElementById(id);
+  const escH = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : (many || one + "s"));
+  const toneOf = s => s < BANDS.human ? "human" : s < BANDS.ai ? "mixed" : "ai";
+
+  const H_JEROME = "There were four of us, George, and William Samuel Harris, and myself, and Montmorency. We were sitting in my room, smoking, and talking about how bad we were, bad from a medical point of view I mean, of course. We were all feeling seedy, and we were getting quite nervous about it. Harris said he felt such extraordinary fits of giddiness come over him at times, that he hardly knew what he was doing; and then George said that he had fits of giddiness too, and hardly knew what he was doing. With me, it was my liver that was out of order. I knew it was my liver that was out of order, because I had just been reading a patent liver-pill circular, in which were detailed the various symptoms by which a man could tell when his liver was out of order. I had them all.";
+  const H_THOREAU = "When I wrote the following pages, or rather the bulk of them, I lived alone, in the woods, a mile from any neighbor, in a house which I had built myself, on the shore of Walden Pond, in Concord, Massachusetts, and earned my living by the labor of my hands only. I lived there two years and two months. At present I am a sojourner in civilized life again. I should not obtrude my affairs so much on the notice of my readers if very particular inquiries had not been made by my townsmen concerning my mode of life, which some would call impertinent, though they do not appear to me at all impertinent, but, considering the circumstances, very natural and pertinent. Some have asked what I got to eat; if I did not feel lonesome; if I was not afraid; and the like.";
+  const A_IND = "The Industrial Revolution marked a pivotal turning point in human history, fundamentally transforming the way people lived and worked. Beginning in Britain in the late eighteenth century, it saw the rise of mechanized production, the growth of factories, and the rapid expansion of cities. These changes brought about significant economic growth, yet they also created new social challenges, including harsh working conditions, child labor, and overcrowded urban slums. Furthermore, the period laid the foundation for modern capitalism and global trade networks. While historians continue to debate its long-term impacts, there is no doubt that the Industrial Revolution reshaped society in profound and lasting ways, setting the stage for the technological advancements that define the modern world.";
+  const LAB_SAMPLES = /*LABSAMPLES*/;
+  const labBlocks = LAB_SAMPLES.split(/\n-{3,}\n/);
+  const SAMPLES = {
+    claude: labBlocks[1].split("\n").slice(1).join("\n"),
+    chatgpt: labBlocks[6].split("\n").slice(1).join("\n"),
+    classic: "Social media has become an integral part of modern life, fundamentally reshaping the way people communicate and connect. Moreover, it plays a crucial role in fostering a sense of community among diverse groups, enabling individuals to share experiences across borders. However, it is important to note that excessive use can have significant effects on mental health, particularly among young people. Furthermore, the rapid spread of misinformation presents a multifaceted challenge for society, underscoring the need for robust digital literacy. Additionally, privacy concerns continue to shape the ongoing debate about regulation. Ultimately, navigating the complexities of the digital landscape requires a balanced approach. In conclusion, while social media offers numerous benefits, it is essential to harness its potential responsibly and thoughtfully.",
+    mixed: [H_JEROME, H_THOREAU, A_IND, "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this."].join("\n\n"),
+    human: H_JEROME
+  };
+
+  // ---------- tabs ----------
+  document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+    document.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "panel-" + t.dataset.tab));
+  });
+
+  // ---------- word counts ----------
+  const counters = { input: "count", known: "countK", unknown: "countU" };
+  const updateCount = id => { if (counters[id]) $(counters[id]).textContent = plural(nWords($(id).value), "word"); };
+  Object.keys(counters).forEach(id => $(id).addEventListener("input", () => updateCount(id)));
+
+  // ---------- file upload ----------
+  let uploadTarget = "input";
+  document.querySelectorAll("[data-upload]").forEach(b => b.onclick = () => { uploadTarget = b.dataset.upload; $("file").value = ""; $("file").click(); });
+  async function readDocx(file) {
+    if (typeof JSZip === "undefined") throw new Error("The .docx reader didn't load. Copy and paste the text instead.");
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const xml = await zip.file("word/document.xml").async("string");
+    const doc = new DOMParser().parseFromString(xml, "application/xml");
+    const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    return [...doc.getElementsByTagNameNS(W, "p")].map(p => {
+      let s = "";
+      for (const n of p.getElementsByTagNameNS(W, "*")) { if (n.localName === "t") s += n.textContent; else if (n.localName === "tab") s += " "; else if (n.localName === "br") s += "\n"; }
+      return s;
+    }).filter(s => s.trim()).join("\n\n");
+  }
+  $("file").onchange = async () => {
+    const f = $("file").files[0]; if (!f) return;
+    const msgEl = { input: $("msg"), lab: $("msgL") }[uploadTarget] || $("msgC");
+    msgEl.className = "msg"; msgEl.textContent = "";
+    try {
+      let text;
+      if (/\.docx$/i.test(f.name)) text = await readDocx(f);
+      else if (/\.(txt|md)$/i.test(f.name) || f.type.startsWith("text/")) text = await f.text();
+      else throw new Error("Only .txt and .docx files can be read here. For a PDF or Google Doc, copy and paste the text.");
+      $(uploadTarget).value = text; updateCount(uploadTarget);
+      msgEl.className = "msg info"; msgEl.textContent = `Loaded ${f.name} (${plural(nWords(text), "word")}).`;
+    } catch (e) { msgEl.textContent = e.message || "Couldn't read that file."; }
+  };
+
+  // ---------- full analysis of one text ----------
+  function fullAnalysis(raw) {
+    const cl = cleanText(raw);
+    const text = cl.text;
+    const r = analyze(text);
+    if (r.tooShort) return { tooShort: true, wc: r.wc };
+    r.text = text; r.cleanNotes = cl.notes;
+    r.attr = attribute(text, r);
+    r.win = slidingWindow(text);
+    r.segs = segments(text).filter(s => s.score != null);
+    r.cautions = cautions(r);
+    if (r.f.tooClean) r.cautions.push("This text sounds casual but is unusually tidy (no slips, even rhythm, neat ending). Some careful human writers write like this, so don't read much into that clue alone.");
+    if (r.win && r.win.max >= 70 && r.win.min <= 35 && r.band !== "ai") r.band = "mixed";
+    if (r.segs.length >= 2) { const hi = Math.max(...r.segs.map(s => s.score)), lo = Math.min(...r.segs.map(s => s.score)); if (hi >= 65 && lo <= 35 && r.band !== "ai") r.band = "mixed"; }
+    r.english = englishCoverage(text);
+    return r;
+  }
+  const BAND_TEXT = {
+    human: ["Human-leaning", "human", "Few known AI habits. AI text written in a plain or casual style can still score this low, so this isn't proof a person wrote it."],
+    inconclusive: ["Inconclusive", "mixed", "Not enough evidence either way. Plenty of human writing and plenty of lightly edited AI writing land here."],
+    mixed: ["Mixed: part of it stands out", "mixed", "Most of the text looks human-leaning, but at least one stretch shows many AI habits. See the section scan and the shaded sentences below."],
+    ai: ["AI-leaning", "ai", "Many habits that chatbots overuse. That's a reason to look closer, not proof."]
+  };
+
+  // ---------- explanation rows ----------
+  function describe(r) {
+    const c = r.counts, k = r.contrib;
+    const rhythm = (k.cv || 0) + (k.extreme || 0);
+    const ex = type => [...new Set(r.hits.filter(h => h.type === type).map(h => '"' + r.text.slice(h.start, h.end).trim().replace(/\s+/g, " ").slice(0, 40) + '"'))].slice(0, 4).join(", ");
+    const exLabel = re => [...new Set(r.hits.filter(h => h.type === "phrase" && re.test(h.label)).map(h => '"' + r.text.slice(h.start, h.end).trim().replace(/\s+/g, " ").slice(0, 40) + '"'))].slice(0, 3).join(", ");
+    return [
+      { v: k.hard, t: "Certain giveaways", d: `${c.hard} found: ${ex("hard")}.` },
+      { v: k.vocab, t: "Words AI over-uses (measured)", d: `${c.vocab} found: ${ex("word")}.` },
+      { v: k.phrase, t: "Stock phrases", d: `${c.phrase} found: ${exLabel(/^(?!fiction|email|vague)/) || ex("phrase")}.` },
+      { v: k.fiction, t: "Fiction clichés", d: `${c.fiction} found: ${exLabel(/fiction/)}.` },
+      { v: k.hopeEnd, t: "Tidy hopeful ending", d: "The story ends on a neat, hopeful note, which recent AI stories lean towards." },
+      { v: k.email, t: "Email boilerplate", d: `${c.eopen} stock opener(s) and ${c.eclose} stock closer(s): ${exLabel(/email/)}.` },
+      { v: k.negpar, t: "\"Not X, it's Y\" contrasts", d: `${c.negpar} found. Counts less than before, because recent Claude versions use fewer negations.` },
+      { v: k.frame, t: "Chatbot-style framing", d: `${plural(c.frame, "sentence")} opening like "The key is…", "Here's…" or "In short".` },
+      { v: k.part, t: "Trailing -ing clauses", d: `${c.part} found (", highlighting…"). AI uses these 2–5× more than people.` },
+      { v: k.trans, t: "Formal transition openers", d: `${c.trans} of ${c.sentences} sentences start with words like "Moreover" or "Additionally".` },
+      { v: k.summ, t: "Summary closer", d: "Ends with a recap such as \"In short\" or \"Overall\". Opus 5.5 does this about 10× more than Opus 5." },
+      { v: k.vague, t: "Vague attributions", d: `${c.vague} found: ${exLabel(/vague/)}. Who exactly?` },
+      { v: k.hedge, t: "Hedging", d: `${plural(c.hedge, "hedge")} ("may", "often", "typically", "it depends").` },
+      { v: k.praise, t: "Generic praise words", d: `${c.praise} words like "amazing", "valuable", "meaningful".` },
+      { v: k.fmt, t: "Bullets, headings and bold", d: `${c.bullets} bullet lines, ${c.headings} headings, ${c.bolds} bold phrases${c.emoji ? `, ${c.emoji} emoji` : ""}.` },
+      { v: k.colon, t: "Colons", d: `${c.colons} colons introducing a point.` },
+      { v: k.tri, t: "Rule-of-three lists", d: `${plural(c.tri, "list")} like "A, B, and C".` },
+      { v: k.dash, t: "Em dashes (weak, version-dependent)", d: `${plural(c.dashes, "em dash", "em dashes")}. Some models use many, others (like Claude Opus 5.5) almost none.` },
+      { v: k.lowSpec, t: "Few concrete specifics", d: `Few names, numbers or quotes (${c.specifics.toFixed(1)} per 100 words). Generic writing is a mild AI sign.` },
+      { v: k.even, t: "Overly even tone", d: `Sentence lengths${c.paras >= 3 ? " and paragraph lengths" : ""} are very uniform, with no exclamations or questions.` },
+      { v: k.tooClean, t: "Casual but too clean", d: "Sounds casual, yet has no slips at all, even rhythm and a neat moral or generic ending." },
+      { v: k.wrap, t: "Neat moral ending", d: "The last sentence wraps things up in a stock way." },
+      { v: rhythm, t: "Sentence rhythm", d: `${c.sentences} sentences, ${c.minLen}–${c.maxLen} words (average ${c.avgLen.toFixed(0)}, spread ${c.cv.toFixed(2)}). ${rhythm < -0.15 ? "Lengths vary a lot, which is more typical of people." : "Fairly even lengths."}` },
+      { v: k.slips, t: "Human slips and casual markers", d: `${c.slips} found (missing apostrophes, lowercase "i", slang, "!!").` }
+    ];
+  }
+
+  function renderAttr(r) {
+    const a = r.attr;
+    if (r.score < 45 && !r.counts.hard) {
+      $("attr").innerHTML = `<p class="none" style="margin:4px 0 0">Not enough AI-like signs to compare chatbot styles. (Model clues found anyway: Claude ${a.claude.toFixed(1)}, ChatGPT ${a.gpt.toFixed(1)}.)</p>`;
+      return;
+    }
+    const total = a.claude + a.gpt;
+    const pos = total ? 50 + (a.gpt - a.claude) / Math.max(total, 4) * 50 : 50;
+    const head = a.lean === "claude" ? ["Claude-leaning", "var(--claude)"] : a.lean === "chatgpt" ? ["ChatGPT-leaning", "var(--gpt)"] : ["Other model, or can't tell", "var(--muted)"];
+    const note = a.lean === "chatgpt" ? "Many other models (Gemini, Grok, DeepSeek, Llama and others) write in a similar way, partly because they were trained on ChatGPT-style text. So this really means \"ChatGPT or a model like it\"."
+      : a.lean === "claude" ? "Based mostly on habits of recent Claude versions (Opus 5.5, Sonnet 5). Older and future versions write differently."
+      : total < 2 ? "Too few model-specific clues. The text could come from any model, or from a person." : "Clues point both ways. It could be either, another model, or edited text.";
+    $("attr").innerHTML = `<div class="verdict" style="color:${head[1]}">${head[0]}${a.confidence !== "none" ? ` <span class="pill">${a.confidence} confidence</span>` : ""}</div>
+      <div class="tug"><div class="marker" style="left:${pos}%"></div></div><div class="tug-lbl"><span>Claude</span><span>ChatGPT</span></div>
+      <p class="note" style="margin:8px 0 0">${escH(note)} This guess has only been checked on a handful of sample passages, so treat it as a hint.</p>
+      <div class="attr">
+        <div class="side"><b style="color:var(--claude)">Claude clues (${a.claude.toFixed(1)})</b>${a.ev.claude.length ? `<ul>${a.ev.claude.map(x => `<li>${escH(x)}</li>`).join("")}</ul>` : `<span class="none">None found</span>`}</div>
+        <div class="side"><b style="color:var(--gpt)">ChatGPT clues (${a.gpt.toFixed(1)})</b>${a.ev.gpt.length ? `<ul>${a.ev.gpt.map(x => `<li>${escH(x)}</li>`).join("")}</ul>` : `<span class="none">None found</span>`}</div>
+      </div>`;
+  }
+
+  function renderMarked(r) {
+    const text = r.text;
+    const tints = r.win ? r.win.sentences.filter(s => s.score != null && s.score >= 65).map(s => [s.start, s.end]) : [];
+    $("tintNote").textContent = tints.length ? "Shaded sentences sit in a stretch that scored 65+ on its own." : "";
+    const cuts = new Set([0, text.length]);
+    r.hits.forEach(h => { cuts.add(h.start); cuts.add(h.end); });
+    tints.forEach(([a, b]) => { cuts.add(a); cuts.add(b); });
+    const pts = [...cuts].sort((a, b) => a - b);
+    let out = "";
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1]; if (a === b) continue;
+      let piece = escH(text.slice(a, b));
+      const h = r.hits.find(h => h.start <= a && h.end >= b);
+      if (h) piece = `<mark class="${h.type}" title="${escH(h.label)}">${piece}</mark>`;
+      if (tints.some(([s, e]) => s <= a && e >= b)) piece = `<span class="tint">${piece}</span>`;
+      out += piece;
+    }
+    $("marked").innerHTML = out;
+  }
+
+  let lastSummary = "";
+  function run() {
+    const msg = $("msg"); msg.className = "msg"; msg.textContent = "";
+    const r = fullAnalysis($("input").value);
+    if (r.tooShort) { $("result").classList.add("hide"); msg.textContent = `Only ${plural(r.wc, "word")}. There's too little to go on, so please paste at least 40 (150+ is better).`; return; }
+    if (r.english < 20) { msg.className = "msg info"; msg.textContent = "This doesn't look like English. The checker only knows English writing habits, so this score means very little."; }
+    $("result").classList.remove("hide");
+
+    // cleaning notice
+    const n = r.cleanNotes, parts = [];
+    if (n.hidden) parts.push(`${plural(n.hidden, "invisible character")} removed`);
+    if (n.homoglyphs) parts.push(`${plural(n.homoglyphs, "look-alike letter")} (such as a Cyrillic "о" inside an English word) swapped for normal letters`);
+    if (n.fullwidth) parts.push(`${plural(n.fullwidth, "full-width character")} converted`);
+    if (n.spaces) parts.push(`${plural(n.spaces, "unusual space")} normalised`);
+    $("cleanNote").classList.toggle("hide", !parts.length);
+    if (parts.length) $("cleanNote").innerHTML = `<b>The text was cleaned before checking:</b> ${escH(parts.join("; "))}.${n.homoglyphs ? " Look-alike letters are sometimes used on purpose to fool detectors." : ""}${n.hidden ? " Invisible characters can come from copying text out of some AI tools, websites or word processors." : ""}`;
+
+    const B = BAND_TEXT[r.band];
+    $("scoreNum").textContent = r.score;
+    $("scoreNum").style.color = `var(--${B[1]})`;
+    $("verdict").textContent = B[0];
+    $("verdictNote").textContent = r.counts.hard ? "Contains text a chatbot typically leaves behind when its answer is pasted in. See the red box above." : B[2];
+    $("confPill").textContent = r.wc < 120 ? "Low confidence: short text" : r.wc < 250 ? "Medium confidence" : "Higher confidence: long enough text";
+    $("marker").style.left = r.score + "%";
+
+    const hard = r.hits.filter(h => h.type === "hard");
+    $("giveaways").classList.toggle("hide", !hard.length);
+    if (hard.length) {
+      const items = [...new Map(hard.map(h => [h.label + r.text.slice(h.start, h.end), h])).values()].slice(0, 6);
+      $("giveaways").innerHTML = `<h2>Leftover chatbot text found</h2><p class="h2note" style="margin-bottom:8px">These lines are almost never written by people. They usually appear when a chatbot's reply is copied in without editing, though someone could also type or quote them on purpose.</p><ul class="diffs">${items.map(h => `<li><b>${escH(h.label)}:</b> "${escH(r.text.slice(h.start, h.end).trim().slice(0, 80))}"</li>`).join("")}</ul>`;
+    }
+
+    $("cautions").classList.toggle("hide", !r.cautions.length);
+    if (r.cautions.length) $("cautions").innerHTML = `<h2>Read the score with care</h2><ul class="diffs">${r.cautions.map(c => `<li>${escH(c)}</li>`).join("")}</ul>`;
+
+    renderAttr(r);
+
+    const rows = describe(r).filter(s => Math.abs(s.v || 0) > 0.02).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+    const max = Math.max(1.5, ...rows.map(s => Math.abs(s.v)));
+    $("signals").innerHTML = rows.length ? rows.map(s => {
+      const w = Math.min(50, Math.abs(s.v) / max * 50);
+      const style = s.v > 0 ? `left:50%;width:${w}%;background:var(--ai)` : `right:50%;width:${w}%;background:var(--human)`;
+      return `<div class="sig"><b>${escH(s.t)}</b><div class="push"><i style="${style}"></i></div><div class="d">${escH(s.d)}</div></div>`;
+    }).join("") + `<div class="push-lbl"><span>human</span><span>AI</span></div>` : `<p class="none">No signals either way.</p>`;
+
+    const segs = r.segs;
+    $("segCard").classList.toggle("hide", segs.length < 2);
+    if (segs.length >= 2) {
+      const total = segs.reduce((a, s) => a + (s.end - s.start), 0);
+      $("strip").innerHTML = segs.map((s, i) => `<div title="Section ${i + 1}: ${s.score}" style="flex:${(s.end - s.start) / total};background:var(--${toneOf(s.score)})">${s.score}</div>`).join("");
+      $("segs").innerHTML = segs.map((s, i) => `<div class="seg"><div class="badge" style="background:var(--${toneOf(s.score)})">${s.score}</div><div><b>Section ${i + 1}</b> · ${plural(nWords(r.text.slice(s.start, s.end)), "word")}<div class="note">${escH(r.text.slice(s.start, s.end).trim().slice(0, 140))}…</div></div></div>`).join("");
+      const hi = Math.max(...segs.map(s => s.score)), lo = Math.min(...segs.map(s => s.score));
+      if (hi >= 60 && hi - lo >= 30) $("segs").insertAdjacentHTML("afterbegin", `<p style="margin:0 0 8px;font-size:.92rem"><b>One part stands out:</b> it scores ${hi}, while the lowest-scoring part scores ${lo}. That's worth a closer look.</p>`);
+    }
+
+    renderMarked(r);
+
+    lastSummary = [
+      `AI Text Detector result: ${r.score}/100, ${B[0]} (${r.wc} words, ${$("confPill").textContent.toLowerCase()}).`,
+      r.score >= 45 || r.counts.hard ? `Model guess: ${r.attr.lean === "claude" ? "Claude-leaning" : r.attr.lean === "chatgpt" ? "ChatGPT-leaning (or a similar model)" : "can't tell"}${r.attr.confidence !== "none" ? ` (${r.attr.confidence} confidence)` : ""}.` : "",
+      ...rows.filter(s => s.v > 0.1).slice(0, 6).map(s => `+ ${s.t}: ${s.d}`),
+      ...rows.filter(s => s.v < -0.1).slice(0, 3).map(s => `- ${s.t}: ${s.d}`),
+      segs.length >= 2 ? `Sections: ${segs.map(s => s.score).join(", ")}` : "",
+      ...r.cautions.map(c => "Caution: " + c),
+      "Note: this checks for writing habits chatbots overuse. It is not proof of who wrote the text."
+    ].filter(Boolean).join("\n");
+    $("copy").textContent = "Copy summary";
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function copyText(btn, text, label) {
+    try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+    catch { btn.textContent = "Copy blocked: select the text instead"; }
+    setTimeout(() => btn.textContent = label, 2500);
+  }
+  $("copy").onclick = () => copyText($("copy"), lastSummary, "Copy summary");
+  $("go").onclick = run;
+  document.querySelectorAll("[data-sample]").forEach(b => b.onclick = () => { $("input").value = SAMPLES[b.dataset.sample]; updateCount("input"); run(); });
+  $("clear").onclick = () => { $("input").value = ""; updateCount("input"); $("result").classList.add("hide"); $("msg").textContent = ""; };
+
+  // ---------- compare ----------
+  function runCompare() {
+    const a = cleanText($("known").value).text, b = cleanText($("unknown").value).text;
+    const msg = $("msgC"); msg.className = "msg"; msg.textContent = "";
+    if (nWords(a) < 120 || nWords(b) < 120) { $("cresult").classList.add("hide"); msg.textContent = "Please paste at least 120 words in each box (300+ is much better)."; return; }
+    const r = compareStyles(a, b);
+    $("cresult").classList.remove("hide");
+    const v = { "similar": ["Styles look similar", "human"], "somewhat different": ["Styles are somewhat different", "mixed"], "very different": ["Styles are very different", "ai"] }[r.level];
+    $("cverdict").textContent = v[0]; $("cverdict").style.color = `var(--${v[1]})`;
+    const short = Math.min(r.nA, r.nB) < 300;
+    $("cnote").textContent = (r.level === "similar" ? "The two texts use small everyday words, sentences and punctuation in similar ways. That fits the same writer, but someone imitating them, or a chatbot told to copy their style, could match too." :
+      r.level === "very different" ? "The writing habits differ a lot. That can happen when someone else (or an AI) wrote the second text, but also between a rushed draft and polished work, or between different kinds of writing." :
+      "Some habits differ. This is common even for one writer across different topics, so on its own it means little.") + (short ? " At least one text is under 300 words, so treat this as rough." : "") + ` (Style distance ${r.delta.toFixed(2)}: same-writer pairs in testing were usually below 0.55.)`;
+    $("cdiffs").innerHTML = r.diffs.length ? r.diffs.map(d => `<li>${escH(d)}</li>`).join("") : "<li>No big differences in sentence length, contractions, punctuation or vocabulary.</li>";
+    const sa = analyze(a), sb = analyze(b);
+    $("cscores").innerHTML = [["Known writing", sa], ["Text to check", sb]].map(([n, s]) => s.tooShort ? "" : `<div class="seg"><div class="badge" style="background:var(--${toneOf(s.score)})">${s.score}</div><div><b>${n}</b><div class="note">${escH(BAND_TEXT[s.band][0])}</div></div></div>`).join("");
+  }
+  $("goCompare").onclick = runCompare;
+  $("sampleCompare").onclick = () => {
+    $("known").value = "Okay so I'll be honest, I didn't think I'd like Macbeth at all when we started it. Shakespeare always seemed kind of boring to me, like a bunch of old guys talking in riddles. But this play actually surprised me. Macbeth starts off as this brave soldier everyone respects, and then he hears one prophecy from some witches and basically loses his mind. What I found really interesting is Lady Macbeth. She's the one pushing him at first, but by the end she's the one who falls apart the worst, sleepwalking and trying to wash blood off her hands that isn't even there. I think the main message is that guilt eats away at you no matter how powerful you get. It made me think about how one bad choice can lead to so many more. My mum reckons Shakespeare is overrated but I don't know, I reckon this one holds up pretty well even now.";
+    $("unknown").value = SAMPLES.classic + " " + A_IND;
+    updateCount("known"); updateCount("unknown"); runCompare();
+  };
+
+  // ---------- test lab ----------
+  $("cut").oninput = () => { $("cutVal").textContent = $("cut").value; if (!$("lresult").classList.contains("hide")) runLab(); };
+  const LABEL_RE = /^\s*\[?\s*(human|claude|chatgpt|gpt|openai|ai|other)\s*\]?\s*:?\s*$/i;
+  let labCsv = "";
+  function runLab() {
+    const msg = $("msgL"); msg.className = "msg"; msg.textContent = "";
+    const raw = $("lab").value.replace(/\r\n?/g, "\n").trim();
+    if (!raw) { msg.textContent = "Paste some texts first, or load the sample passages."; return; }
+    const cut = +$("cut").value;
+    const blocks = raw.split(/\n\s*-{3,}\s*\n/).map(b => b.trim()).filter(Boolean);
+    const rows = [];
+    blocks.forEach((b, i) => {
+      const lines = b.split("\n");
+      let label = "Unlabelled";
+      const m = lines[0].match(LABEL_RE);
+      if (m) { lines.shift(); const l = m[1].toLowerCase(); label = l === "human" ? "Human" : l === "claude" ? "Claude" : /chatgpt|gpt|openai/.test(l) ? "ChatGPT" : "AI"; }
+      const text = lines.join("\n").trim();
+      const r = fullAnalysis(text);
+      if (r.tooShort) { rows.push({ i: i + 1, label, wc: r.wc, short: true, preview: text.slice(0, 60) }); return; }
+      const flagged = r.score >= cut;
+      const isAI = label !== "Human" && label !== "Unlabelled";
+      const det = label === "Unlabelled" ? null : (isAI ? flagged : !flagged);
+      const lean = r.attr.lean;
+      const mdl = (label === "Claude" || label === "ChatGPT") ? (lean === "unclear" ? "?" : (lean === label.toLowerCase())) : null;
+      rows.push({ i: i + 1, label, wc: r.wc, score: r.score, band: r.band, lean, conf: r.attr.confidence, det, mdl, preview: text.replace(/\s+/g, " ").slice(0, 70) });
+    });
+    const ok = rows.filter(r => !r.short);
+    const by = l => ok.filter(r => r.label === l);
+    const hum = by("Human"), ais = ok.filter(r => ["Claude", "ChatGPT", "AI"].includes(r.label));
+    const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "–";
+    const mean = a => a.length ? Math.round(a.reduce((s, r) => s + r.score, 0) / a.length) : "–";
+    const mdlRows = ok.filter(r => r.mdl !== null);
+    $("lsummary").innerHTML = `<h2>Summary at cut-off ${cut}</h2>
+      <table><tr><th>Group</th><th class="n">Texts</th><th class="n">Average score</th><th class="n">Flagged as AI</th></tr>
+      ${["Human", "Claude", "ChatGPT", "AI", "Unlabelled"].map(l => by(l)).map((g, j) => g.length ? `<tr><td>${["Human", "Claude", "ChatGPT", "Other AI", "Unlabelled"][j]}</td><td class="n">${g.length}</td><td class="n">${mean(g)}</td><td class="n">${pct(g.filter(r => r.score >= cut).length, g.length)}</td></tr>` : "").join("")}
+      </table>
+      <p style="margin:6px 0 0;font-size:.93rem"><b>Human texts wrongly flagged:</b> ${hum.length ? `${hum.filter(r => r.score >= cut).length} of ${hum.length}` : "no human texts labelled"} · <b>AI texts caught:</b> ${ais.length ? `${ais.filter(r => r.score >= cut).length} of ${ais.length}` : "no AI texts labelled"} · <b>Model guessed right:</b> ${mdlRows.length ? `${mdlRows.filter(r => r.mdl === true).length} of ${mdlRows.length} (wrong ${mdlRows.filter(r => r.mdl === false).length}, can't tell ${mdlRows.filter(r => r.mdl === "?").length})` : "no Claude/ChatGPT labels"}</p>
+      ${rows.some(r => r.short) ? `<p class="note">${rows.filter(r => r.short).length} text(s) were under 40 words and skipped.</p>` : ""}
+      <p class="note" style="margin-bottom:0">Tip: drag the cut-off to see the trade-off. Lower catches more AI but flags more humans. Paste these results back to Claude to help tune the weights.</p>`;
+    const mark = v => v === null ? "" : v === "?" ? `<span class="note">can't tell</span>` : v ? `<span class="ok">✓</span>` : `<span class="bad">✗</span>`;
+    const leanTxt = r => r.lean === "claude" ? "Claude" : r.lean === "chatgpt" ? "ChatGPT" : "can't tell";
+    $("ltable").innerHTML = `<tr><th>#</th><th>Label</th><th class="n">Words</th><th class="n">Score</th><th>Result</th><th>Detected?</th><th>Looks like</th><th>Model?</th><th>Start of text</th></tr>` +
+      rows.map(r => r.short ? `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td colspan="5" class="note">too short</td><td class="note">${escH(r.preview)}</td></tr>` :
+        `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td class="n" style="color:var(--${toneOf(r.score)});font-weight:700">${r.score}</td><td>${BAND_TEXT[r.band][0].split(":")[0]}</td><td>${mark(r.det)}</td><td>${r.score >= 45 ? leanTxt(r) + (r.conf !== "none" ? ` <span class="note">(${r.conf})</span>` : "") : `<span class="note">–</span>`}</td><td>${mark(r.mdl)}</td><td class="note">${escH(r.preview)}…</td></tr>`).join("");
+    labCsv = ["#\tlabel\twords\tscore\tresult\tdetected\tlooks_like\tmodel_correct\tstart"].concat(rows.map(r => r.short ? `${r.i}\t${r.label}\t${r.wc}\t\ttoo short\t\t\t\t${r.preview}` : `${r.i}\t${r.label}\t${r.wc}\t${r.score}\t${r.band}\t${r.det === null ? "" : r.det ? "yes" : "no"}\t${leanTxt(r)}\t${r.mdl === null ? "" : r.mdl === "?" ? "unclear" : r.mdl ? "yes" : "no"}\t${r.preview}`)).join("\n") + `\ncut-off\t${cut}`;
+    $("countL").textContent = plural(blocks.length, "text");
+    $("lresult").classList.remove("hide");
+  }
+  $("goLab").onclick = runLab;
+  $("sampleLab").onclick = () => { $("lab").value = LAB_SAMPLES; runLab(); };
+  $("copyLab").onclick = () => copyText($("copyLab"), labCsv, "Copy results");
+}
+</script>
+</body>
+</html>

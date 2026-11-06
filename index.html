@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Text Detector</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f5f1; --card: #ffffff; --ink: #1c1c1a; --muted: #6b6a63; --line: #e3e1d9; --soft: #f0eee8;
+    --human: #2f7d5b; --mixed: #b7791f; --ai: #c0392b; --accent: #3b5bdb; --claude: #b85c38; --gpt: #1a7f6e;
+    --hl-word: #ffe58f; --hl-phrase: #ffc9a8; --hl-struct: #c7dbff; --hl-trans: #e3d0ff; --hl-hard: #ff9b9b; --tint: rgba(192, 57, 43, .09);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --card: #1d1d1b; --ink: #ecebe5; --muted: #9b9a90; --line: #33322e; --soft: #262522;
+      --human: #4fbf8f; --mixed: #e0a740; --ai: #ef6a5b; --accent: #7c93ff; --claude: #e08a63; --gpt: #3fc2a9;
+      --hl-word: #6b5612; --hl-phrase: #7a3d1c; --hl-struct: #233f78; --hl-trans: #4a2f75; --hl-hard: #8a2020; --tint: rgba(239, 106, 91, .13);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 28px 18px 60px; }
+  h1 { font-size: 1.75rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .warn { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--mixed); border-radius: 8px; padding: 12px 14px; font-size: .92rem; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .tab { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 9px 14px; font-weight: 600; color: var(--muted); }
+  .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+  .panel { display: none; } .panel.on { display: block; }
+  label.lbl { display: block; font-weight: 600; font-size: .92rem; margin: 6px 0 6px; }
+  textarea { width: 100%; min-height: 200px; resize: vertical; padding: 14px; font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #lab { min-height: 260px; font-size: .92rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 0; }
+  button { font: inherit; font-size: .93rem; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 13px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 8px 18px; }
+  button:hover { filter: brightness(0.95); }
+  .count { margin-left: auto; color: var(--muted); font-size: .88rem; }
+  .msg { color: var(--ai); margin-top: 10px; font-size: .93rem; }
+  .msg.info { color: var(--mixed); }
+  .hide { display: none !important; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .card.alert { border-left: 4px solid var(--ai); }
+  .card.caution { border-left: 4px solid var(--mixed); }
+  .card.notice { border-left: 4px solid var(--accent); font-size: .92rem; }
+  .score-line { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .score { font-size: 3.2rem; font-weight: 750; line-height: 1; min-width: 3ch; }
+  .verdict { font-size: 1.18rem; font-weight: 650; }
+  .note { color: var(--muted); font-size: .88rem; }
+  .meter { position: relative; height: 12px; border-radius: 6px; margin: 18px 0 6px; background: linear-gradient(90deg, var(--human) 0%, var(--human) 33%, var(--mixed) 35%, var(--mixed) 53%, var(--ai) 57%, var(--ai) 100%); }
+  .marker { position: absolute; top: -5px; width: 4px; height: 22px; background: var(--ink); border-radius: 2px; transform: translateX(-2px); transition: left .4s; }
+  .scale { display: grid; grid-template-columns: 35fr 20fr 45fr; color: var(--muted); font-size: .78rem; }
+  .scale span:nth-child(2) { text-align: center; } .scale span:nth-child(3) { text-align: right; }
+  .pill { display: inline-block; font-size: .78rem; padding: 2px 9px; border-radius: 99px; background: var(--soft); color: var(--muted); margin-top: 6px; }
+  h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  .h2note { color: var(--muted); font-size: .85rem; margin: 0 0 14px; }
+  .sig { display: grid; grid-template-columns: 1fr 150px; gap: 4px 16px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .sig:first-of-type { border-top: 0; }
+  .sig b { font-weight: 600; }
+  .sig .d { grid-column: 1; color: var(--muted); font-size: .86rem; }
+  .push { grid-column: 2; grid-row: 1 / span 2; align-self: center; position: relative; height: 10px; background: var(--soft); border-radius: 5px; }
+  .push::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+  .push i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+  .push-lbl { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); max-width: 150px; margin-left: auto; }
+  .none { color: var(--muted); font-size: .9rem; }
+  .attr { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+  .attr .side { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .attr .side b { display: block; margin-bottom: 4px; }
+  .attr ul { margin: 0; padding-left: 18px; font-size: .86rem; color: var(--muted); }
+  .tug { position: relative; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--claude), var(--soft) 45%, var(--soft) 55%, var(--gpt)); margin: 12px 0 4px; }
+  .tug .marker { top: -5px; }
+  .tug-lbl { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted); }
+  .strip { display: flex; gap: 3px; height: 26px; margin-bottom: 12px; }
+  .strip div { border-radius: 4px; min-width: 6px; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; color: #fff; }
+  .seg { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: start; padding: 8px 0; border-top: 1px solid var(--line); font-size: .9rem; }
+  .seg:first-of-type { border-top: 0; }
+  .badge { border-radius: 6px; text-align: center; font-weight: 700; color: #fff; padding: 2px 0; font-size: .85rem; }
+  #marked { white-space: pre-wrap; word-wrap: break-word; line-height: 1.75; }
+  .tint { background: var(--tint); box-shadow: 0 0 0 2px var(--tint); border-radius: 2px; }
+  mark { border-radius: 3px; padding: 1px 2px; color: inherit; cursor: help; }
+  mark.word { background: var(--hl-word); } mark.phrase { background: var(--hl-phrase); } mark.struct { background: var(--hl-struct); }
+  mark.trans { background: var(--hl-trans); } mark.hard { background: var(--hl-hard); font-weight: 600; }
+  .legend { color: var(--muted); font-size: .82rem; margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 680px) { .grid2, .attr { grid-template-columns: 1fr; } .sig { grid-template-columns: 1fr 100px; } }
+  ul.diffs { margin: 8px 0 0; padding-left: 20px; }
+  ul.diffs li { margin: 4px 0; font-size: .93rem; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p, details li { font-size: .92rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { color: var(--human); font-weight: 700; } .bad { color: var(--ai); font-weight: 700; }
+  .tablewrap { overflow-x: auto; }
+  input[type=range] { width: 160px; vertical-align: middle; }
+  code { font-size: .88em; background: var(--soft); padding: 1px 4px; border-radius: 4px; }
+  footer { color: var(--muted); font-size: .82rem; margin-top: 24px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>AI Text Detector</h1>
+  <p class="sub">See how many known AI-writing habits a text shows, which chatbot it looks more like, and where the AI-like parts are. You can also compare it with someone's known writing, or test the detector on your own examples.</p>
+
+  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In testing it flagged none of 216 human-written passages, but it caught only about half of the AI-written ones: AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="check">Check a text</button>
+    <button class="tab" data-tab="compare">Compare with known writing</button>
+    <button class="tab" data-tab="lab">Test lab</button>
+  </div>
+
+  <!-- ============ CHECK ============ -->
+  <section class="panel on" id="panel-check">
+    <textarea id="input" placeholder="Paste at least 40 words here, or upload a .txt or .docx file (150+ words gives a much more reliable result)…" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="primary" id="go">Analyse</button>
+      <button data-upload="input">Upload file</button>
+      <button id="clear">Clear</button>
+      <span class="count" id="count">0 words</span>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span class="note">Try a sample:</span>
+      <button data-sample="claude">Claude-style answer</button>
+      <button data-sample="chatgpt">ChatGPT-style answer</button>
+      <button data-sample="classic">Old ChatGPT essay</button>
+      <button data-sample="mixed">Human essay with a pasted AI paragraph</button>
+      <button data-sample="human">Human (1889 novel)</button>
+    </div>
+    <div class="msg" id="msg"></div>
+
+    <section id="result" class="hide" style="margin-top:22px">
+      <div class="card notice hide" id="cleanNote"></div>
+      <div class="card alert hide" id="giveaways"></div>
+
+      <div class="card">
+        <div class="score-line">
+          <div class="score" id="scoreNum">0</div>
+          <div style="flex:1;min-width:220px">
+            <div class="verdict" id="verdict"></div>
+            <div class="note" id="verdictNote"></div>
+            <span class="pill" id="confPill"></span>
+          </div>
+          <button id="copy">Copy summary</button>
+        </div>
+        <div class="meter"><div class="marker" id="marker" style="left:0%"></div></div>
+        <div class="scale"><span>0–34 human-leaning</span><span>35–54 inconclusive</span><span>55–100 AI-leaning</span></div>
+      </div>
+
+      <div class="card caution hide" id="cautions"></div>
+
+      <div class="card" id="attrCard">
+        <h2>Which AI does it look more like?</h2>
+        <div id="attr"></div>
+      </div>
+
+      <div class="card hide" id="segCard">
+        <h2>Section by section</h2>
+        <p class="h2note">Each part scored on its own. One part scoring much higher than the rest can mean text was pasted in from somewhere else. Short sections give less reliable scores.</p>
+        <div class="strip" id="strip"></div>
+        <div id="segs"></div>
+      </div>
+
+      <div class="card">
+        <h2>What affected the score</h2>
+        <p class="h2note">Bars to the right push the score up (more AI-like), bars to the left pull it down.</p>
+        <div id="signals"></div>
+      </div>
+
+      <div class="card">
+        <h2>Flagged text</h2>
+        <p class="h2note">Hover or tap a highlight to see why it was flagged. <span id="tintNote"></span></p>
+        <div id="marked"></div>
+        <div class="legend">
+          <span style="--c:var(--hl-hard)">certain giveaway</span>
+          <span style="--c:var(--hl-word)">AI-favoured word</span>
+          <span style="--c:var(--hl-phrase)">stock phrase / cliché</span>
+          <span style="--c:var(--hl-struct)">sentence pattern / formatting</span>
+          <span style="--c:var(--hl-trans)">formal transition</span>
+          <span style="--c:var(--tint)">part of an AI-like stretch</span>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ COMPARE ============ -->
+  <section class="panel" id="panel-compare">
+    <p class="note" style="margin-top:0">Paste something the person <b>definitely wrote themselves</b> (for example an in-class essay), then the text you're unsure about. This compares writing style: how often they use small words like "the", "but" and "really", plus sentence length, contractions and punctuation. It works best with 300+ words of each and the same kind of writing (two essays, not an essay and a text message).</p>
+    <div class="grid2">
+      <div>
+        <label class="lbl" for="known">1. Known writing by this person</label>
+        <textarea id="known" placeholder="Paste writing you know they did themselves…" spellcheck="false"></textarea>
+        <div class="row"><button data-upload="known">Upload file</button><span class="count" id="countK">0 words</span></div>
+      </div>
+      <div>
+        <label class="lbl" for="unknown">2. Text to check</label>
+        <textarea id="unknown" placeholder="Paste the text you're unsure about…" spellcheck="false"></textarea>
+        <div class="row"><button data-upload="unknown">Upload file</button><span class="count" id="countU">0 words</span></div>
+      </div>
+    </div>
+    <div class="row"><button class="primary" id="goCompare">Compare styles</button><button id="sampleCompare">Try an example</button></div>
+    <div class="msg" id="msgC"></div>
+    <section id="cresult" class="hide" style="margin-top:20px">
+      <div class="card">
+        <div class="verdict" id="cverdict"></div>
+        <div class="note" id="cnote" style="margin-top:4px"></div>
+        <ul class="diffs" id="cdiffs"></ul>
+      </div>
+      <div class="card">
+        <h2>AI habit score for each text</h2>
+        <p class="h2note">Scored separately with the main checker, for context.</p>
+        <div id="cscores"></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ TEST LAB ============ -->
+  <section class="panel" id="panel-lab">
+    <p class="note" style="margin-top:0">Paste several texts separated by a line containing only <code>---</code>. Put a label on the first line of each one: <code>Human</code>, <code>Claude</code> or <code>ChatGPT</code> (or <code>AI</code> for any other model). Then press Run to see how the detector does on your own examples.</p>
+<pre class="note" style="background:var(--soft);padding:10px 12px;border-radius:8px;margin:0 0 10px;white-space:pre-wrap">Human
+my own writing goes here…
+---
+ChatGPT
+a ChatGPT answer goes here…
+---
+Claude
+a Claude answer goes here…</pre>
+    <textarea id="lab" placeholder="Human&#10;paste text…&#10;---&#10;ChatGPT&#10;paste text…" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="primary" id="goLab">Run tests</button>
+      <button data-upload="lab">Upload .txt</button>
+      <button id="sampleLab">Load 20 sample passages</button>
+      <label class="note">AI cut-off: <input type="range" id="cut" min="35" max="80" step="1" value="55"> <b id="cutVal">55</b></label>
+      <span class="count" id="countL"></span>
+    </div>
+    <div class="msg" id="msgL"></div>
+    <section id="lresult" class="hide" style="margin-top:20px">
+      <div class="card" id="lsummary"></div>
+      <div class="card">
+        <div class="row" style="margin:0 0 6px"><h2 style="margin:0">Results</h2><button id="copyLab" style="margin-left:auto">Copy results</button></div>
+        <p class="h2note">"Detected?" means the score reached the AI cut-off. Texts in the inconclusive band count as not flagged. "Model?" is only checked for texts labelled Claude or ChatGPT.</p>
+        <div class="tablewrap"><table id="ltable"></table></div>
+      </div>
+    </section>
+  </section>
+
+  <input type="file" id="file" accept=".txt,.md,.docx,text/plain" class="hide">
+
+  <details>
+    <summary>How accurate is it?</summary>
+    <p><b>Detection.</b> I tested it on 216 human-written passages (programming documentation, package READMEs, Newton's <i>Opticks</i>, the GPL licence, classic novels and speeches) and 53 AI-written passages in five styles. Part of the AI set was kept back and only used for checking. Results at the 55 cut-off:</p>
+    <table>
+      <tr><th>Kind of text</th><th class="n">Flagged as AI</th></tr>
+      <tr><td>Human-written (216 passages, plus 9 everyday-style ones)</td><td class="n">0% (4% landed in "inconclusive")</td></tr>
+      <tr><td>AI, classic ChatGPT essay style</td><td class="n">100%</td></tr>
+      <tr><td>AI, modern chatbot answers</td><td class="n">about 55%</td></tr>
+      <tr><td>AI, short stories</td><td class="n">about 40%</td></tr>
+      <tr><td>AI, emails and posts</td><td class="n">about 15%</td></tr>
+      <tr><td>AI told to sound like a teenager</td><td class="n">about 10%</td></tr>
+      <tr><td>Any text with leftover chatbot lines ("I hope this helps", "[Your Name]", citation codes)</td><td class="n">nearly always</td></tr>
+    </table>
+    <p><b>Big caveat:</b> every AI passage was written by one AI (Claude), and the "ChatGPT-style" ones are imitations, not real ChatGPT output. The everyday "human" passages in the sample set were also written by Claude imitating people. The real human texts are mostly formal or old, with no genuine teenage or casual writing. Use the Test lab with real examples to find out how it does for you.</p>
+    <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. It never named the wrong one, but that's a tiny test on imitations, so treat it as a hint.</p>
+    <p><b>Mixed texts:</b> in a test essay made of three human paragraphs and one pasted AI paragraph, the whole essay scored 25 and was labelled "Mixed", while the AI paragraph's section scored 67 and the sliding window reached 76. No stretch of human text in the test set scored above 39.</p>
+    <p>Tools that run a real language model do much better. Pangram reports catching 99.7% of Claude Opus 5.5 answers. A page like this can't run such a model, and I haven't added one because I couldn't test it here.</p>
+  </details>
+
+  <details>
+    <summary>What it looks for, and the research behind it</summary>
+    <ul>
+      <li><b>Certain giveaways.</b> Lines a chatbot leaves behind when an answer is pasted unedited: "As an AI language model", "I hope this helps", "If you want, I can also…", "Would you like me to…", "[Your Name]", ChatGPT citation codes (<code>oaicite</code>, <code>utm_source=chatgpt.com</code>).</li>
+      <li><b>Measured words only.</b> Words that studies counted as over-used against human writing: <i>delve</i>, <i>showcasing</i>, <i>underscores</i> (15 million science abstracts), and <i>dependable</i> (23× the human rate), <i>steady</i> and <i>thoughtful</i> for Claude Opus 5.5 (Graphite, 2026). Many words from blog lists were dropped: Originality.ai checked 10 million words of ChatGPT output and found favourites like "delve" were actually rare.</li>
+      <li><b>Structure.</b> Sentence length and spread, bullet/heading/bold density, paragraph evenness, "In short"-style closers, "not X, it's Y" contrasts, rule-of-three lists, trailing ", highlighting…" clauses (2–5× more common in AI), hedging, vague attributions ("experts suggest"), generic praise words, colons, and a lack of concrete names and numbers. The absence-type clues count only a little.</li>
+      <li><b>Fiction and email habits.</b> "For a long moment", "said quietly", "felt something shift", tidy hopeful endings, and email boilerplate such as "I hope this email finds you well" plus "Please don't hesitate to reach out".</li>
+      <li><b>Too-clean casual text.</b> Text that sounds casual ("honestly", "kind of") but has no slips at all, even sentences and a neat moral at the end. Real people writing carefully can look like this, so it adds only a moderate amount and never decides the result alone.</li>
+      <li><b>Version-aware clues.</b> Habits change between model versions. Pangram found Claude Opus 5.5 says "genuinely" 83% less than Opus 5, says "in short" 11× more, uses about 85% more bullets, and writes shorter, more even sentences. Em dashes almost vanished in Opus 5.5 but are still common in some GPT-5 output. So em dashes and "genuinely" now count for very little.</li>
+      <li><b>Human signs.</b> Missing apostrophes ("dont"), lowercase "i", slang, "!!", and very uneven sentence lengths lower the score.</li>
+      <li><b>Text cleaning.</b> Invisible characters are removed, look-alike letters (for example a Cyrillic "о" hidden in an English word to fool detectors) are swapped back, and curly quotes are straightened before checking. You're told when this happens.</li>
+    </ul>
+    <p><b>Claude vs ChatGPT.</b> The "Idiosyncrasies in LLMs" study (ICML 2025) could tell ChatGPT, Claude, Grok, Gemini and DeepSeek apart 97% of the time with a trained model. It found ChatGPT bolds key points, titles answers with headers and favours "certainly", "such as" and "overall", while Claude uses plain lists, less bold, and phrases like "based on" and "here". Newer clues come from 2026 studies of Opus 5.5 and GPT-5.x/6. The study also found models trained on ChatGPT output write like ChatGPT, so an unknown model will often look ChatGPT-leaning.</p>
+    <p><b>Fairness.</b> A 2023 Stanford study found commercial detectors wrongly flagged 61% of essays by non-native English writers. This tool doesn't score vocabulary richness or word length, and it warns you when a text is formal, very plain or list-heavy. It only works on English.</p>
+    <p>Sources: <a href="https://www.pangram.com/blog/can-pangram-detect-opus-5-5">Pangram: Opus 5.5</a> · <a href="https://www.remio.ai/post/claude-opus-5-5-writing-tells-changed-but-they-did-not-disappear">Graphite study (via remio)</a> · <a href="https://arxiv.org/abs/2502.12150">Idiosyncrasies in LLMs</a> · <a href="https://originality.ai/blog/can-humans-detect-chatgpt">Originality.ai: common ChatGPT words</a> · <a href="https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing">Wikipedia: Signs of AI writing</a> · <a href="https://arxiv.org/abs/2406.07016">Kobak et al.</a> · <a href="https://arxiv.org/abs/2410.16107">Reinhart et al.</a> · <a href="https://arxiv.org/abs/2304.02819">Liang et al.</a></p>
+  </details>
+
+  <footer>Runs entirely in your browser. Your text is not sent anywhere.</footer>
+</main>
+
+<script>
+// ==CORE==
+/* =====================================================================
+   AI Text Detector engine (v4). Rules only: no model, no network.
+   Evidence sources (see the page's "research" section):
+   - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
+   - Reinhart et al., PNAS 2025 (participial clauses etc.)
+   - Sun et al., "Idiosyncrasies in LLMs", ICML 2025 (ChatGPT vs Claude fingerprints)
+   - Pangram, Opus 5.5 vs Opus 5 (Sep 2026); Graphite tells study (Sep 2026)
+   - Wikipedia: Signs of AI writing
+   ===================================================================== */
+
+// ---------- 1. Cleaning ----------
+const HIDDEN_RE = /[​-‍⁠-⁤﻿­᠎]/g;
+const SPACE_RE = /[  -   　]/g;
+const HOMO = { "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x", "і": "i", "ј": "j", "ѕ": "s", "ԁ": "d", "ӏ": "l", "һ": "h", "ԛ": "q", "ԝ": "w",
+  "А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O", "Р": "P", "С": "C", "Т": "T", "Х": "X", "У": "Y", "І": "I", "Ј": "J", "Ѕ": "S",
+  "ο": "o", "α": "a", "ν": "v", "ρ": "p", "ι": "i", "Ο": "O", "Α": "A", "Β": "B", "Ε": "E", "Ζ": "Z", "Η": "H", "Ι": "I", "Κ": "K", "Μ": "M", "Ν": "N", "Ρ": "P", "Τ": "T", "Χ": "X", "Υ": "Y" };
+const HOMO_CHARS = new RegExp("[" + Object.keys(HOMO).join("") + "]");
+function cleanText(raw) {
+  const notes = { hidden: 0, homoglyphs: 0, quotes: 0, spaces: 0, fullwidth: 0 };
+  let t = raw.replace(/\r\n?/g, "\n");
+  t = t.replace(HIDDEN_RE, () => { notes.hidden++; return ""; });
+  t = t.replace(SPACE_RE, () => { notes.spaces++; return " "; });
+  t = t.replace(/[！-～]/g, c => { notes.fullwidth++; return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+  // fold look-alike letters only inside words that also contain Latin letters (leaves real Russian/Greek alone)
+  t = t.replace(/[\p{L}\p{M}]+/gu, w => {
+    if (!HOMO_CHARS.test(w) || !/[A-Za-z]/.test(w)) return w;
+    return w.replace(/./gu, c => { if (HOMO[c]) { notes.homoglyphs++; return HOMO[c]; } return c; });
+  });
+  t = t.replace(/[‘’‚‛′]/g, () => { notes.quotes++; return "'"; }).replace(/[“”„‟″]/g, () => { notes.quotes++; return '"'; });
+  return { text: t, notes };
+}
+
+// ---------- 2. Word and phrase lists ----------
+// Words with MEASURED over-use vs human writing (not blog lists). weight ~ strength.
+const AI_WORDS = {
+  3: ["delve", "delves", "delved", "delving", "tapestry", "camaraderie", "intricate", "intricacies", "underscores", "underscored", "underscoring", "showcasing", "showcases", "testament", "meticulous", "meticulously", "interplay", "unwavering", "multifaceted", "ever-evolving", "dependable"],
+  2: ["pivotal", "fostering", "fosters", "vibrant", "enduring", "garnered", "bolstered", "seamless", "seamlessly", "invaluable", "transformative", "resonate", "resonates", "grappling", "nuanced", "notably", "commendable", "palpable", "bustling", "nestled", "realm", "embark", "embarking", "thoughtful", "meaningful", "steady"],
+  1: ["additionally", "furthermore", "moreover", "crucial", "comprehensive", "enhance", "enhancing", "landscape", "navigate", "navigating", "leverage", "leveraging", "valuable", "insights", "profound", "ultimately", "showcase", "underscore", "significant", "essential", "unique", "overall"]
+};
+// [regex, weight, label]
+const AI_PHRASES = [
+  ["it(?:'s| is) (?:important|worth|crucial|essential) to (?:note|mention|remember|recognize|consider|understand)", 3, "filler hedge"],
+  ["it(?:'s| is) worth noting", 2.5, "filler hedge"],
+  ["in today's (?:fast-paced|digital|modern|ever-changing|interconnected|world|society)", 3, "stock opener"],
+  ["plays? (?:a |an )?(?:crucial|vital|pivotal|key|significant|important|central) role", 3, "importance puffery"],
+  ["(?:rich|vibrant) (?:cultural )?(?:heritage|history|tapestry|culture)", 3, "promotional cliché"],
+  ["(?:serves|stands) as (?:a|an|the)", 2, "\"serves as\" phrasing"],
+  ["(?:is|as|remains|stands as) a (?:testament|reminder) (?:to|of|that)", 3, "importance puffery"],
+  ["(?:in summary|to sum up|in essence|all in all)\\b", 2, "summary signpost"],
+  ["whether you(?:'re| are) (?:a |an |looking|here|new|just)", 2, "marketing address"],
+  ["(?:excited|thrilled|delighted) to (?:share|announce|welcome)", 3, "announcement cliché"],
+  ["(?:embark on|begin|start) (?:a|this) (?:new )?(?:chapter|journey)", 2, "announcement cliché"],
+  ["what the future holds", 2, "stock phrase"],
+  ["a (?:wide|broad|diverse) (?:range|array|variety|spectrum) of", 2, "stock phrase"],
+  ["strik(?:e|ing) (?:a|the right) balance", 2, "stock phrase"],
+  ["(?:this|that) (?:really )?matters\\b", 3, "\"this matters\" (116× human rate, Opus 5.5)"],
+  ["why [\\w'-]+(?: [\\w'-]+){0,3} matters\\b", 3, "\"why X matters\""],
+  ["looking ahead\\b", 2.5, "\"looking ahead\""],
+  ["adds? (?:another|an extra|a new) layer", 2.5, "\"adds another layer\""],
+  ["what comes next", 2, "\"what comes next\""],
+  ["rather than simply", 2.5, "\"rather than simply\""],
+  ["is (?:more than|not just) (?:a |an |just )?[\\w'-]+(?: [\\w'-]+){0,3}[;,—–]\\s*it(?:'s| is)?\\b", 3, "\"is more than a X, it…\""],
+  ["here's (?:the (?:thing|short version|catch)|what(?:'s)? (?:actually )?(?:going on|happening|matters))", 2, "assistant opener"],
+  ["(?:short answer|the short version)\\b", 2, "assistant opener"],
+  ["let's (?:break (?:this|it) down|dive in|dive into)", 3, "assistant opener"],
+  ["the (?:catch|upshot|bottom line|real (?:lesson|question|point)|practical takeaway|key takeaway) (?:is|here)", 2, "assistant framing"],
+  ["for (?:generations|years) to come|future generations", 2, "stock phrase"],
+  ["the human (?:condition|experience|spirit)", 2, "stock phrase"],
+  ["(?:shed(?:s|ding)? light on|pav(?:e|es|ed|ing) the way|set(?:s|ting)? the stage)", 2, "stock phrase"],
+  ["(?:deeper|valuable|unique) (?:insights?|understanding)", 2, "stock phrase"],
+  ["a (?:sense|feeling) of (?:community|belonging|purpose|unity|wonder|accomplishment)", 2, "stock phrase"],
+  ["(?:harness|unlock|unleash)(?:es|ing)? (?:the|its|their|your) (?:full )?(?:power|potential)", 3, "stock phrase"],
+  ["navigat(?:e|es|ing) (?:the|these|this) (?:complexit|challeng|landscape|world)", 3, "stock phrase"],
+  ["(?:despite|amid) (?:these|the|its|such) challenges", 2, "challenges formula"],
+  ["(?:memories|experience) (?:to cherish|that will last)|unforgettable experience|must-visit", 3, "promotional cliché"],
+  ["(?:has|have) never been more (?:important|relevant|crucial)", 3, "stock phrase"],
+  ["(?:profound|lasting|far-reaching) (?:impact|effects?|implications?)", 2, "importance puffery"],
+  ["moral imperative|timeless (?:exploration|tale|story|classic)", 3, "importance puffery"],
+  ["may provide|not necessarily|does not (?:establish|guarantee)", 1.5, "hedge phrase (GPT-6 era)"],
+  ["perhaps the most|one of the (?:most|best) [\\w'-]+ (?:about|in|of)", 1.5, "superlative framing"]
+];
+// Fiction habits (Pangram: "for a long moment", "said quietly", "felt something", "paused", "stared" rose in Opus 5.5)
+const FICTION = [
+  "for a long moment", "for a moment,? (?:neither|nobody|no one)", "said quietly", "(?:she|he|they|i) said softly", "felt something (?:shift|loosen|settle|break|crack)",
+  "something (?:shifted|loosened|settled|cracked) (?:in|inside)", "let out a (?:breath|shaky breath|slow breath)", "(?:a )?breath (?:she|he|i|they) didn't know", "the silence (?:stretched|settled|hung)",
+  "(?:heart|pulse) (?:pounding|hammering|racing)", "couldn't quite (?:name|place|explain|shake)", "neither of them (?:moved|spoke)", "something about [^.!?]{1,25} felt (?:wrong|off|different)",
+  "the weight of (?:it|the|his|her|their)", "for the first time in (?:years|a long time|weeks|months)", "(?:she|he|i|they) (?:paused|stared)\\b", "a small smile", "the ghost of a smile", "in that moment", "(?:weathered|trembling) hands", "a (?:warm|soft|golden|gentle) (?:glow|light|smile|breeze)", "(?:she|he) whispered", "trembling slightly", "never truly", "(?:she|he|they) realized (?:that )?"
+];
+const EMAIL_OPEN = ["(?:i )?hope (?:this (?:email|message|note) finds you well|you(?:'re| are) (?:doing )?well|you(?:'ve| have) been well|your week is going well)", "i (?:wanted|am writing) to (?:reach out|follow up|touch base|let you know)", "just (?:wanted to )?(?:following|follow) up", "thank you for (?:reaching out|your (?:email|message|patience))", "i trust this"];
+const EMAIL_CLOSE = ["(?:please )?(?:don't|do not) hesitate to (?:reach out|contact|let me know)", "(?:please )?let me know if you have any (?:questions|concerns)", "thank you for your (?:time|consideration|understanding)(?: and (?:consideration|attention|understanding))?", "i look forward to (?:hearing|working|your)", "happy to (?:discuss|help|jump on|chat)", "feel free to reach out"];
+const HEDGES = ["may", "might", "could potentially", "can help", "often", "typically", "generally", "tends? to", "it depends", "in many cases", "to some extent", "arguably", "not necessarily", "in some cases", "can vary", "likely"];
+const VAGUE = ["(?:some|many|most) (?:experts|researchers|scientists|critics|people|observers|scholars|analysts) (?:say|argue|believe|suggest|agree|note|point out|have noted)",
+  "(?:studies|research|evidence|experts) (?:show|shows|suggest|suggests|indicate|indicates|has shown|have shown)", "it is (?:widely|often|generally|commonly) (?:believed|accepted|said|thought|agreed)",
+  "(?:critics|observers|commentators) (?:argue|say|have argued)", "according to (?:experts|many|some|research)", "(?:industry|recent) reports (?:suggest|show)"];
+const PRAISE = ["amazing", "incredible", "wonderful", "fantastic", "remarkable", "exceptional", "outstanding", "powerful", "innovative", "vibrant", "stunning", "invaluable", "seamless", "impressive", "inspiring", "rewarding", "exciting", "thoughtful", "meaningful", "engaging", "dynamic", "robust", "transformative", "unparalleled", "unforgettable", "breathtaking"];
+const TRANSITIONS = ["moreover", "furthermore", "additionally", "in addition", "ultimately", "overall", "in conclusion", "consequently", "notably", "importantly", "in essence", "first and foremost", "crucially"];
+const SLANG = ["lol", "lmao", "ngl", "tbh", "idk", "imo", "omg", "btw", "gonna", "wanna", "gotta", "kinda", "sorta", "yeah", "nah", "yep", "dunno", "ya", "haha", "ugh", "meh", "u", "ur", "pls", "thx", "cos", "cuz", "bro", "lowkey", "highkey", "fr", "deadass", "rn", "smh", "istg", "bc"];
+const NO_APOS = ["dont", "cant", "wont", "im", "ive", "didnt", "doesnt", "isnt", "wasnt", "thats", "youre", "theyre", "shouldnt", "couldnt", "wouldnt", "havent", "whats", "id", "ill"];
+const NOT_PARTICIPLES = new Set(["nothing", "something", "anything", "everything", "morning", "evening", "during", "thing", "things", "king", "string", "spring", "ceiling", "building", "according", "including", "regarding", "concerning", "pending", "following", "notwithstanding", "bring", "sing", "ring", "wing", "sibling", "darling", "pudding", "wedding", "meaning", "feeling", "beginning", "ending", "setting", "settings", "learning", "training", "reading", "writing", "painting", "warning", "padding", "heading", "missing", "opening", "rating", "funding", "housing", "clothing", "lightning", "being"]);
+
+// Near-certain giveaways: text a chatbot leaves behind when its answer is pasted unedited.
+const HARD = [
+  ["as an ai(?: language)? model|i(?:'m| am) (?:just )?an ai\\b|as a (?:large )?language model", "chatbot self-reference"],
+  ["as of my (?:last |latest )?(?:knowledge )?(?:cutoff|cut-off|update|training)", "knowledge-cutoff disclaimer"],
+  ["i hope this (?:helps|was helpful|gives you)|hope that helps\\b", "chatbot sign-off"],
+  ["(?:let me know|feel free to (?:ask|let me know)) if you(?:'d| would)? (?:like|want) me to", "chatbot sign-off"],
+  ["would you like me to (?:expand|elaborate|revise|adjust|make|add|write|tailor|help|turn|draft|create)", "chatbot offer"],
+  ["if you(?:'d)? (?:want|like),? i can (?:also )?(?:turn|make|write|draft|expand|tailor|create|give|help|put)", "chatbot offer (ChatGPT-style)"],
+  ["(?:^|\\n|[.!?]\\s+)(?:certainly|absolutely|of course)! ", "chatbot opener"],
+  ["great question[!.]", "chatbot opener"],
+  ["here(?:'s| is) (?:a |an |the |your )?(?:revised|rewritten|polished|improved|refined|updated|reworded|shorter|longer) (?:version|draft|essay|paragraph)", "chatbot hand-off"],
+  ["\\[(?:your |insert |recipient|company name|student name|teacher|name of|date of|today)[^\\]]{0,30}\\]", "unfilled placeholder"],
+  ["oaicite|contentreference|turn0(?:search|news|view)\\d*|utm_source=chatgpt\\.com|【\\d+[^】]{0,20}】", "chatbot citation code"],
+  ["regenerate response|copy code\\b", "pasted chat interface text"]
+];
+
+// ---------- 3. Attribution fingerprints ----------
+// [regex, weight, label]. Claude: Opus 5.5 / Sonnet 5 and earlier. ChatGPT: GPT-4o → GPT-5.x / 6.
+const CLAUDE_FP = [
+  ["\\b(?:this|that) (?:really )?matters\\b", 2, "\"this matters\""],
+  ["\\bwhy [\\w'-]+(?: [\\w'-]+){0,3} matters\\b", 2, "\"why X matters\""],
+  ["\\blooking ahead\\b", 1.5, "\"looking ahead\""],
+  ["\\badds? (?:another|an extra) layer", 2, "\"adds another layer\""],
+  ["\\bwhat comes next\\b", 1.5, "\"what comes next\""],
+  ["\\brather than simply\\b", 2, "\"rather than simply\""],
+  ["\\bis more than (?:a |an |just )?[\\w'-]+(?: [\\w'-]+){0,3}[;,—–]\\s*it", 2, "\"is more than a X, it…\""],
+  ["\\bin short\\b", 1.5, "\"in short\" (11× more in Opus 5.5)"],
+  ["\\bthe core idea\\b", 1.5, "\"the core idea\""],
+  ["\\bperhaps the most\\b|\\bthe most (?:popular|powerful)\\b", 1, "\"perhaps the most\""],
+  ["\\b(?:dependable|steady|thoughtful)\\b", 1, "dependable / steady / thoughtful"],
+  ["\\bbased on (?:the|your|this) (?:text|passage|information|description|excerpt)\\b|\\baccording to the (?:text|passage|excerpt)\\b", 2, "\"based on the text\""],
+  ["\\bthe honest answer\\b|\\bgenuinely\\b", 1, "\"genuinely\" / \"the honest answer\" (Opus 5-era)"],
+  ["(?:^|[.!?]\\s+)(?:here's|here is) (?:the|what|how|a)\\b", 0.5, "opens with \"Here's\""],
+  ["\\bfor a long moment\\b|\\bsaid quietly\\b|\\bfelt something\\b|\\bsomething shifted\\b|\\b(?:she|he|they|i) (?:paused|stared)\\b", 1, "Opus 5.5 fiction habits (\"for a long moment\", \"paused\")"]
+];
+const GPT_FP = [
+  ["\\bcertainly\\b", 1.5, "\"certainly\""],
+  ["(?:^|[.!?]\\s+)overall,", 1, "\"Overall,\""],
+  ["\\bbelow is\\b|\\bbelow are\\b", 1.5, "\"below is\""],
+  ["\\bhere's a (?:breakdown|quick|step-by-step|clear|simple|concise)\\b", 1.5, "\"here's a breakdown\""],
+  ["\\bif you(?:'d)? (?:want|like),? i can\\b", 2.5, "\"If you want, I can…\" offer"],
+  ["\\bwould you like me to\\b", 2, "\"Would you like me to…\""],
+  ["\\babsolutely!|\\bgreat question\\b", 2, "\"Absolutely!\" / \"Great question\""],
+  ["\\bhope this (?:email|message) finds you well\\b", 1.5, "\"hope this email finds you well\""],
+  ["\\b(?:delve|delves|delving|tapestry|in today's (?:fast-paced|digital))\\b", 1, "GPT-4-era words (delve, tapestry)"],
+  ["\\blet's dive (?:in|into)\\b|\\bdive deeper\\b", 1.5, "\"let's dive in\""],
+  ["\\bmay provide\\b|\\bnot necessarily\\b|\\bdoes not establish\\b", 1.5, "\"may provide\" / \"not necessarily\" (GPT-6 era)"],
+  ["\\bsuch as\\b", 0.4, "\"such as\""],
+  ["(?:^|[.!?]\\s+)ultimately,", 1, "\"Ultimately,\""],
+  ["\\bplays? (?:a |an )?(?:crucial|vital|pivotal) role\\b|\\bnavigate (?:the|these|online)\\b", 1, "classic ChatGPT essay phrases"],
+  ["\\bon the other hand\\b|\\bneither [\\w ]{1,25} nor\\b", 0.5, "balanced \"on one hand / other hand\" framing"],
+  ["\\bin that moment\\b|\\b(?:she|he) whispered\\b", 0.75, "ChatGPT fiction habits (\"in that moment\")"]
+];
+
+const WORD = /[A-Za-z0-9][A-Za-z0-9'-]*/g;
+function clamp(x, a = 0, b = 1) { return Math.max(a, Math.min(b, x)); }
+function nWords(s) { return (s.match(WORD) || []).length; }
+function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+function splitSentences(t) {
+  return t.replace(/\s+/g, " ").trim().split(/(?<=[.!?])["')\]]?\s+(?=["'(\[]?[A-Z0-9])/).filter(s => s.trim());
+}
+// sentences with offsets (also breaks on line breaks, so bullets count as sentences)
+function sentenceSpans(t) {
+  const out = []; const re = /[^.!?\n]+(?:[.!?]+["')\]]?|(?=\n)|$)/g; let m;
+  while ((m = re.exec(t))) { if (!m[0].trim()) { if (!m[0].length) re.lastIndex++; continue; } const lead = m[0].search(/\S/); out.push([m.index + lead, m.index + m[0].length]); }
+  return out;
+}
+
+const WORD_WEIGHT = new Map();
+for (const w of Object.keys(AI_WORDS)) for (const x of AI_WORDS[w]) WORD_WEIGHT.set(x, +w);
+const WORD_RE = new RegExp("\\b(" + [...WORD_WEIGHT.keys()].sort((a, b) => b.length - a.length).map(escRe).join("|") + ")\\b", "gi");
+const PHRASE_RES = AI_PHRASES.map(([s, w, l]) => [new RegExp("\\b" + s, "gi"), w, l]);
+const FICTION_RE = new RegExp("\\b(?:" + FICTION.join("|") + ")", "gi");
+const EOPEN_RE = new RegExp("\\b(?:" + EMAIL_OPEN.join("|") + ")", "gi");
+const ECLOSE_RE = new RegExp("\\b(?:" + EMAIL_CLOSE.join("|") + ")", "gi");
+const HEDGE_RE = new RegExp("\\b(?:" + HEDGES.join("|") + ")\\b", "gi");
+const VAGUE_RE = new RegExp("\\b(?:" + VAGUE.join("|") + ")", "gi");
+const PRAISE_RE = new RegExp("\\b(?:" + PRAISE.join("|") + ")\\b", "gi");
+const HARD_RES = HARD.map(([s, l]) => [new RegExp(s, "gi"), l]);
+const CLAUDE_RES = CLAUDE_FP.map(([s, w, l]) => [new RegExp(s, "gi"), w, l]);
+const GPT_RES = GPT_FP.map(([s, w, l]) => [new RegExp(s, "gi"), w, l]);
+
+// ---------- 4. Feature extraction ----------
+function features(text) {
+  const wc = nWords(text);
+  const sents = splitSentences(text.replace(/^\s*(?:[-*•]|\d+\.)\s+/gm, ""));
+  const ns = Math.max(1, sents.length);
+  const lens = sents.map(nWords).filter(n => n > 0);
+  const per100 = n => n / Math.max(1, wc) * 100;
+  const hits = [];
+  const add = (start, end, type, label) => hits.push({ start, end, type, label });
+  const scan = (re, fn) => { re.lastIndex = 0; let m; while ((m = re.exec(text))) { fn(m); if (!m[0].length) re.lastIndex++; } };
+  const lower = text.toLowerCase();
+  let m;
+
+  // giveaways
+  let hard = 0;
+  for (const [re, label] of HARD_RES) scan(re, m => { hard++; const lead = m[0].search(/\S/); add(m.index + Math.max(0, lead), m.index + m[0].length, "hard", label); });
+
+  // measured AI words
+  let vocab = 0, vocabN = 0;
+  scan(WORD_RE, m => { vocab += WORD_WEIGHT.get(m[1].toLowerCase()) || 1; vocabN++; add(m.index, m.index + m[0].length, "word", "word AI over-uses (measured)"); });
+
+  // stock phrases
+  let phrase = 0, phraseN = 0;
+  for (const [re, w, label] of PHRASE_RES) scan(re, m => { phrase += w; phraseN++; add(m.index, m.index + m[0].length, "phrase", label); });
+
+  // negative parallelism  "not X, it's Y" / "isn't X. It's Y" / "not just X, but Y"
+  let negpar = 0;
+  const NEG = "(?:isn't|is not|wasn't|was not|aren't|are not|doesn't|don't|didn't|won't|it's not|that's not|are never|is never|never truly)";
+  const NP = [
+    new RegExp("\\b" + NEG + "\\s+(?:just |only |simply |merely |really |about |so much )?[^.!?;:—–\\n]{1,60}?\\s*[—–]\\s*(?:it|they|this|that|it's|they're|that's)\\b", "gi"),
+    new RegExp("\\b" + NEG + "\\s+(?:just |only |simply |merely |really |about |so much )?[^.!?;:—–\\n]{1,60}?\\.\\s+(?:It's|It is|It was|They're|That's|This is|Instead|Rather)\\b", "g"),
+    new RegExp("\\b" + NEG + "\\s+(?:just |only |simply |merely |really |about )?[^.!?;:—–\\n]{1,60}?[,;]\\s*(?:it's|it is|it was|they're|but rather|but instead)\\b", "gi"),
+    /\bnot (?:just|only|simply|merely) (?:a |an |the |about )?[^.!?;\n]{1,50}?[,;—–]\s*(?:but|it's|it is|it was|they're|it)\b/gi,
+    /,\s+not\s+(?:the |a |an |your |because |by |just |on |in |for |with )?[\w'-]+(?: [\w'-]+){0,4}[.!?](?:\s|$)/gi
+  ];
+  for (const re of NP) scan(re, m => { negpar++; add(m.index, m.index + m[0].length, "struct", "\"not X, it's Y\" contrast"); });
+
+  // assistant-style framing sentences
+  let frame = 0;
+  const FR = /^(?:That's (?:why|the|what|because|all)|This is (?:why|where|what)|Here's|The (?:fix|catch|key|result|answer|problem|trick|reason|point|takeaway|upshot|good news|bad news|short answer|truth|hard part|big one) (?:is|was|isn't|here)|In practice|None of this|Either way|In other words|Put simply|Simply put|In short|Short answer|Most people|Whatever the|Pick one)\b/;
+  for (const st of sents) if (FR.test(st)) { frame++; const at = text.indexOf(st.slice(0, 30)); const fm = st.match(FR); if (at >= 0 && fm) add(at, at + fm[0].length, "struct", "assistant-style framing"); }
+
+  // trailing -ing clauses
+  let part = 0;
+  scan(/,\s+([a-z]+ing)\b/g, m => { if (!NOT_PARTICIPLES.has(m[1])) { part++; add(m.index + m[0].length - m[1].length, m.index + m[0].length, "struct", "trailing -ing clause"); } });
+
+  // rule of three lists
+  let tri = 0; scan(/\b[\w'-]+(?: [\w'-]+){0,2}, [\w'-]+(?: [\w'-]+){0,2},? (?:and|or) [\w'-]+/g, () => tri++);
+
+  // formal transition openers
+  let trans = 0;
+  scan(new RegExp("(^|[.!?][\"')\\]]?\\s+|\\n)(" + TRANSITIONS.map(escRe).join("|") + ")\\b", "gi"), m => { trans++; const s = m.index + m[1].length; add(s, s + m[2].length, "trans", "formal transition opener"); });
+
+  // summary closers in the last 25% of the text
+  let summ = 0;
+  const tailStart = Math.floor(text.length * 0.7);
+  scan(/(?:^|[.!?]\s+|\n)(in short|in summary|to sum up|in conclusion|overall|the bottom line|tl;dr|all in all|in essence|to summari[sz]e)\b/gi, m => { const s = m.index + m[0].length - m[1].length; if (s >= tailStart) { summ = 1; add(s, s + m[1].length, "struct", "summary closer"); } });
+
+  // fiction habits
+  let fiction = 0; scan(FICTION_RE, m => { fiction++; add(m.index, m.index + m[0].length, "phrase", "fiction cliché"); });
+  // tidy hopeful ending (last sentence)
+  const lastS = (sents[sents.length - 1] || "").toLowerCase();
+  const hopeEnd = /\b(?:for the first time|began to (?:smile|laugh|hope|heal|believe)|smiled|finally (?:felt|knew|understood)|maybe(?:,)? (?:that|this) was enough|was (?:a|the) (?:start|beginning)|(?:felt|feel) like home|hope\b|together\b|light\b|took (?:a|one) (?:step|breath)|began to read|whatever came next)\b/.test(lastS) ? 1 : 0;
+
+  // email boilerplate
+  let eopen = 0, eclose = 0;
+  scan(EOPEN_RE, m => { eopen++; add(m.index, m.index + m[0].length, "phrase", "email boilerplate opener"); });
+  scan(ECLOSE_RE, m => { eclose++; add(m.index, m.index + m[0].length, "phrase", "email boilerplate closer"); });
+  const email = Math.min(eopen, 1) + Math.min(eclose, 2) + (eopen && eclose ? 1 : 0);
+
+  // hedging, vague attributions, generic praise
+  let hedge = 0; scan(HEDGE_RE, () => hedge++);
+  let vague = 0; scan(VAGUE_RE, m => { vague++; add(m.index, m.index + m[0].length, "phrase", "vague attribution (who?)"); });
+  let praise = 0; scan(PRAISE_RE, () => praise++);
+
+  // punctuation and formatting
+  const colons = (text.match(/[A-Za-z)\]"'*]:\s/g) || []).length;
+  const dashes = (text.match(/—|\s–\s/g) || []).length;
+  const lines = text.split("\n").filter(l => l.trim());
+  const bullets = lines.filter(l => /^\s*(?:[-*•]|\d+[.)])\s+\S/.test(l)).length;
+  const headings = lines.filter(l => /^#{1,4}\s+\S/.test(l) || (/^[A-Z][^.!?]{2,60}$/.test(l.trim()) && l.trim().split(/\s+/).length <= 8 && lines.length > 3 && /^(?:[A-Z][\w'-]*\s?)+$/.test(l.trim()))).length;
+  const bolds = (text.match(/\*\*[^*\n]{2,60}\*\*/g) || []).length;
+  const boldLabels = lines.filter(l => /^\s*(?:[-*•]|\d+[.)])?\s*\*\*[^*\n]{1,40}:?\*\*:?/.test(l)).length;
+  const emoji = (text.match(/[\u{1F300}-\u{1FAFF}\u{2705}\u{2728}\u{274C}\u{2B50}]/gu) || []).length;
+  scan(/\*\*[^*\n]{2,60}\*\*|^#{1,4} .+$/gm, m => add(m.index, m.index + m[0].length, "struct", "Markdown formatting"));
+  const fmt = bullets * 0.5 + headings + bolds + boldLabels + emoji;
+  const listShare = lines.length ? bullets / lines.length : 0;
+
+  // rhythm and shape
+  let cv = 0.5, extreme = 0, avgLen = 0;
+  if (lens.length >= 3) {
+    avgLen = lens.reduce((a, b) => a + b, 0) / lens.length;
+    cv = Math.sqrt(lens.reduce((a, b) => a + (b - avgLen) ** 2, 0) / lens.length) / avgLen;
+    extreme = lens.filter(n => n >= 45 || n <= 3).length / lens.length;
+  } else if (lens.length) avgLen = lens.reduce((a, b) => a + b, 0) / lens.length;
+  const paras = text.split(/\n\s*\n/).map(p => nWords(p)).filter(n => n >= 8);
+  let paraCv = 1;
+  if (paras.length >= 3) { const pm = paras.reduce((a, b) => a + b, 0) / paras.length; paraCv = Math.sqrt(paras.reduce((a, b) => a + (b - pm) ** 2, 0) / paras.length) / pm; }
+
+  // human slips and casual markers
+  const slang = (lower.match(new RegExp("\\b(" + SLANG.map(escRe).join("|") + ")\\b", "g")) || []).length;
+  const noApos = (lower.match(new RegExp("\\b(" + NO_APOS.join("|") + ")\\b", "g")) || []).length;
+  const lowerI = (text.match(/(?:^|\s)i(?=[\s,.'!?])/g) || []).length;
+  const lowerStart = sents.filter(s => /^[a-z]/.test(s)).length;
+  const shout = (text.match(/!{2,}|\?{2,}|\?!|!\?|:\)|:\(|:D|;\)|\bx{2,}\b/g) || []).length;
+  const doubleSpace = (text.match(/[a-z.,] {2,}[a-zA-Z]/g) || []).length;
+  const lastLine = text.trim().split("\n").pop() || "";
+  const missingFinal = /[a-z0-9]$/i.test(lastLine) && nWords(lastLine) > 6 ? 1 : 0;
+  const slipsN = noApos + lowerI + shout + slang + doubleSpace + lowerStart + missingFinal;
+  const slips = noApos * 2 + lowerI * 2 + lowerStart * 0.5 + shout + slang + doubleSpace + missingFinal;
+  const casual = (lower.match(/\b(?:honestly|like,|kind of|sort of|pretty much|i guess|i reckon|i think|you know|basically|literally|to be honest|whatever)\b/g) || []).length;
+  const contr = (lower.match(/\b\w+n't\b|\b\w+'(?:re|ve|ll|m|d)\b|\b(?:it|that|there|what|here|let|he|she|who)'s\b/g) || []).length;
+  const excl = (text.match(/[!?]/g) || []).length;
+
+  // generic moral / summary ending
+  const wrap = /\b(ultimately|in the end|at the end of the day|for generations|future generations|remains (?:a|one)|timeless|journey|key to|it depends|depends (?:on )?how|balance|made me (?:think|realise|realize)|taught me|reminder|worth (?:it|noticing|remembering)|you'll notice|give it|what matters|matters most|the (?:simple|little) things)\b/.test(lastS) ? 1 : 0;
+
+  // concrete specifics: digits, names mid-sentence, quoted speech
+  const digits = (text.match(/\b\d[\d,.:%]*\b/g) || []).length;
+  const names = (text.match(/(?<=[a-z,;] )[A-Z][a-z]{2,}/g) || []).length;
+  const quotes = (text.match(/"[^"\n]{3,}"/g) || []).length;
+  const specifics = per100(digits + names + quotes);
+  const lowSpec = wc >= 120 && specifics < 1.2 ? 1 : 0;
+
+  // composites
+  const even = (lens.length >= 6 && cv < 0.38 ? 0.5 : 0) + (paras.length >= 3 && paraCv < 0.22 ? 0.3 : 0) + (excl === 0 && slipsN === 0 && wc >= 120 ? 0.2 : 0);
+  // casual-sounding but suspiciously clean and generic (the "write like a teen" case)
+  const tooClean = (casual + slang >= 2 || contr >= 4) && slipsN === 0 && lens.length >= 6 && cv < 0.55 && (wrap || hopeEnd || lowSpec) ? 1 : 0;
+
+  return {
+    wc, ns, hits, sents,
+    f: {
+      hard, vocab: per100(vocab), phrase: per100(phrase), negpar: negpar / ns, frame: frame / ns, part: part / ns, tri: tri / ns, trans: trans / ns,
+      summ, fiction: per100(fiction), hopeEnd, email, hedge: per100(hedge), vague: per100(vague), praise: per100(praise),
+      colon: per100(colons), dash: per100(dashes), fmt: per100(fmt), cv, extreme, slips: per100(slips), wrap, lowSpec, even, tooClean
+    },
+    counts: {
+      hard, vocab: vocabN, phrase: phraseN, negpar, frame, part, tri, trans, summ, fiction, hopeEnd, email, eopen, eclose, hedge, vague, praise, colons, dashes,
+      bullets, headings, bolds, boldLabels, emoji, listShare, sentences: lens.length, avgLen, cv, paraCv, paras: paras.length, minLen: lens.length ? Math.min(...lens) : 0,
+      maxLen: lens.length ? Math.max(...lens) : 0, slips: slipsN, casual, contr, specifics, digits, names, quotes, wrap, excl,
+      spacedDash: (text.match(/\s—\s/g) || []).length, tightDash: (text.match(/\w—\w/g) || []).length
+    }
+  };
+}
+
+// ---------- 5. Scoring model ----------
+// Logistic model. Weights hand-set from the research, then checked on a labelled set so that
+// absence-of-style clues (no names, even rhythm) can never push a text high on their own.
+const MODEL = { bias: -1.9, w: {
+  hard: 2.5, vocab: 0.4, phrase: 0.55, negpar: 2.5, frame: 3.0, part: 2.3, tri: 0.6, trans: 2.8,
+  summ: 0.6, fiction: 0.9, hopeEnd: 0.3, email: 0.5, hedge: 0.12, vague: 1.2, praise: 0.25,
+  colon: 0.15, dash: 0.25, fmt: 0.3, cv: -1.0, extreme: -2.2, slips: -0.9, wrap: 0.8, lowSpec: 0.35, even: 0.6, tooClean: 1.0
+}, cap: { hard: 3, vocab: 6, phrase: 6, negpar: 0.5, frame: 0.5, part: 0.6, tri: 0.6, trans: 0.5, fiction: 3, email: 4, hedge: 6, vague: 2, praise: 6, colon: 3, dash: 3, fmt: 6, slips: 6 } };
+
+function scoreFeatures(f) {
+  let z = MODEL.bias; const contrib = {};
+  for (const k in MODEL.w) { const v = Math.min(f[k], MODEL.cap[k] ?? Infinity); contrib[k] = MODEL.w[k] * v; z += contrib[k]; }
+  return { p: 1 / (1 + Math.exp(-z)), z, contrib };
+}
+
+const BANDS = { human: 35, ai: 55 };   // below 35 = human-leaning, 35-55 = inconclusive, 55+ = AI-leaning
+
+function analyze(text, opts = {}) {
+  const wc = nWords(text);
+  if (wc < 40) return { tooShort: true, wc };
+  const F = features(text);
+  const { p, contrib } = scoreFeatures(F.f);
+  // short texts are pulled towards the middle: less text, less evidence
+  const conf = opts.noShrink ? 1 : clamp((wc - 40) / 260, 0, 1);
+  const prob = 0.5 + (p - 0.5) * (0.5 + 0.5 * conf);
+  const score = Math.round(prob * 100);
+  const hs = F.hits.slice().sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+  const clean = []; let last = -1;
+  for (const h of hs) if (h.start >= last) { clean.push(h); last = h.end; }
+  let band = score < BANDS.human ? "human" : score < BANDS.ai ? "inconclusive" : "ai";
+  if (F.counts.hard && score >= 45) band = "ai";
+  return { score, band, f: F.f, counts: F.counts, contrib, hits: clean, wc, conf };
+}
+
+// ---------- 6. Claude vs ChatGPT attribution ----------
+function attribute(text, r) {
+  const c = r.counts, ev = { claude: [], gpt: [] };
+  let cl = 0, gp = 0;
+  const run = (res, side) => { for (const [re, w, label] of res) { re.lastIndex = 0; const n = (text.match(re) || []).length; if (n) { const s = Math.min(n, 3) * w; if (side === "c") { cl += s; ev.claude.push(label + (n > 1 ? ` ×${n}` : "")); } else { gp += s; ev.gpt.push(label + (n > 1 ? ` ×${n}` : "")); } } } };
+  run(CLAUDE_RES, "c"); run(GPT_RES, "g");
+  // formatting fingerprints (Sun et al. 2025): ChatGPT bolds list labels and titles answers; Claude uses plain lists
+  if (c.boldLabels >= 2) { gp += 2; ev.gpt.push(`bold labels on list items ×${c.boldLabels}`); }
+  else if (c.bolds >= 3) { gp += 1; ev.gpt.push(`lots of bold text ×${c.bolds}`); }
+  if (c.headings >= 2) { gp += 1; ev.gpt.push("section headers"); }
+  if (c.emoji >= 1) { gp += 1.5; ev.gpt.push("emoji"); }
+  if (c.bullets >= 3 && c.bolds === 0 && c.headings === 0) { cl += 1.5; ev.claude.push("plain bullet list with no bold"); }
+  // dash style: Sonnet-style spaced " — " vs OpenAI-style "word—word" (weak; newer models vary)
+  if (c.spacedDash >= 2 && c.spacedDash > c.tightDash) { cl += 1; ev.claude.push("spaced em dashes ( — )"); }
+  if (c.tightDash >= 1 && c.tightDash > c.spacedDash) { gp += c.tightDash >= 2 ? 1 : 0.5; ev.gpt.push("unspaced em dashes (word—word)"); }
+  // shape: Opus 5.5 writes short, even sentences (~10-13 words)
+  if (c.sentences >= 6 && c.avgLen >= 8 && c.avgLen <= 13.5 && c.cv < 0.5) { cl += 1; ev.claude.push(`short, even sentences (avg ${c.avgLen.toFixed(0)} words)`); }
+  if (c.sentences >= 6 && c.avgLen >= 19) { gp += 0.5; ev.gpt.push(`long sentences (avg ${c.avgLen.toFixed(0)} words)`); }
+  const total = cl + gp, margin = cl - gp;
+  let lean = "unclear";
+  if (total >= 2 && Math.abs(margin) >= 1.5) lean = margin > 0 ? "claude" : "chatgpt";
+  const confidence = lean === "unclear" ? "none" : (Math.abs(margin) >= 4 && total >= 5 ? "medium" : "low");
+  return { claude: cl, gpt: gp, lean, confidence, ev };
+}
+
+// ---------- 7. Long texts: sections and sliding window ----------
+function segments(text, target = 110) {
+  if (nWords(text) < 220) return [];
+  const spans = []; const paraRe = /[^\n]+(?:\n(?!\s*\n)[^\n]+)*/g; let m;
+  while ((m = paraRe.exec(text))) if (nWords(m[0]) > 0) spans.push([m.index, m.index + m[0].length]);
+  let units = spans;
+  if (spans.length < 3) units = sentenceSpans(text);
+  const segs = []; let cur = null;
+  for (const [a, b] of units) {
+    if (!cur) cur = [a, b]; else cur[1] = b;
+    if (nWords(text.slice(cur[0], cur[1])) >= (spans.length >= 3 ? 60 : target)) { segs.push(cur); cur = null; }
+  }
+  if (cur) { if (segs.length && nWords(text.slice(cur[0], cur[1])) < 50) segs[segs.length - 1][1] = cur[1]; else segs.push(cur); }
+  if (segs.length < 2) return [];
+  return segs.map(([a, b]) => { const r = analyze(text.slice(a, b)); return { start: a, end: b, score: r.tooShort ? null : r.score }; });
+}
+// Sliding window over sentences (~90 words, half-overlapping). Each sentence gets the average
+// score of the windows that contain it, so one pasted AI paragraph stands out from the rest.
+function slidingWindow(text, size = 90) {
+  const ss = sentenceSpans(text);
+  if (nWords(text) < 200 || ss.length < 6) return null;
+  const wins = [];
+  for (let i = 0; i < ss.length;) {
+    let j = i, n = 0;
+    while (j < ss.length && n < size) { n += nWords(text.slice(ss[j][0], ss[j][1])); j++; }
+    if (n >= 50) { const r = analyze(text.slice(ss[i][0], ss[j - 1][1]), { noShrink: true }); wins.push({ i, j, score: r.score }); }
+    if (j >= ss.length) break;
+    i += Math.max(1, Math.floor((j - i) / 2));
+  }
+  if (wins.length < 2) return null;
+  const sent = ss.map(([a, b], k) => { const cover = wins.filter(w => k >= w.i && k < w.j); return { start: a, end: b, score: cover.length ? Math.round(cover.reduce((s, w) => s + w.score, 0) / cover.length) : null }; });
+  return { sentences: sent, max: Math.max(...wins.map(w => w.score)), min: Math.min(...wins.map(w => w.score)) };
+}
+
+// ---------- 8. Fairness cautions ----------
+function cautions(r) {
+  const c = r.counts, out = [];
+  if (c.contr === 0 && c.casual === 0 && c.avgLen >= 17 && r.wc >= 100) out.push("This is formal writing. Careful, formal human writing (essays, reports, documentation) shares some habits with AI, so give this score less weight.");
+  if (c.sentences >= 5 && c.avgLen <= 10 && c.slips === 0) out.push("This writing is very plain and simple. Plain writing, including writing by people using English as a second language, is often wrongly flagged by detectors. This tool doesn't score vocabulary or word length, but treat the result with extra caution.");
+  if (c.listShare >= 0.3) out.push("This text is mostly a list. Notes, instructions and slides written by people are often list-heavy too, so formatting clues count for less here.");
+  if (r.wc < 150) out.push("This is a short text. Under about 150 words there isn't much evidence either way, so the score has been pulled towards the middle.");
+  return out;
+}
+// ---------- style comparison (authorship check) ----------
+// Stylometric profile + Burrows' Delta comparison
+const FW = ["the","of","and","to","a","in","that","is","was","it","for","on","with","as","i","he","she","they","we","you","be","at","by","this","had","not","but","from","or","have","an","which","so","if","there","what","all","my","would","can","their","about","just","also","very","really","because","then","more","when","like","do","some","these","been","could","into","than","only","such","while","however","our","me","will","are","were"];
+function profile(text) {
+  const t = text.replace(/[’‘]/g, "'");
+  const words = (t.toLowerCase().match(/[a-z][a-z']*/g) || []);
+  const n = Math.max(1, words.length);
+  const freq = {}; for (const w of FW) freq[w] = 0;
+  for (const w of words) if (w in freq) freq[w]++;
+  for (const w of FW) freq[w] = freq[w] / n * 100;
+  const sents = t.replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-Z0-9"'])/).filter(s => /[a-z]/i.test(s));
+  const lens = sents.map(s => (s.match(/[A-Za-z0-9']+/g) || []).length);
+  const mean = lens.reduce((a, b) => a + b, 0) / Math.max(1, lens.length);
+  const sd = Math.sqrt(lens.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, lens.length));
+  // moving-average type-token ratio (window 50)
+  let mattr = 0, k = 0; for (let i = 0; i + 50 <= words.length; i += 10) { mattr += new Set(words.slice(i, i + 50)).size / 50; k++; }
+  const per100 = re => (t.match(re) || []).length / n * 100;
+  return {
+    n, freq,
+    style: {
+      sentLen: mean, sentVar: mean ? sd / mean : 0,
+      wordLen: words.reduce((a, w) => a + w.length, 0) / n,
+      mattr: k ? mattr / k : 0,
+      contr: per100(/\b\w+n't\b|\b\w+'(?:re|ve|ll|m|d|s)\b/gi),
+      firstPerson: per100(/\b(?:i|me|my|mine)\b/gi),
+      commas: per100(/,/g), dashes: per100(/—|\s–\s|\s-\s|--/g), excl: per100(/!/g), ques: per100(/\?/g), paren: per100(/\(/g), semis: per100(/;/g)
+    }
+  };
+}
+
+// Function-word means/SDs per 100 words, measured on the human test corpus.
+const FW_STATS = {"mu": {"the": 7.263, "of": 2.55, "and": 2.259, "to": 2.874, "a": 2.722, "in": 1.673, "that": 1.114, "is": 2.5, "was": 0.231, "it": 1.025, "for": 1.107, "on": 0.439, "with": 0.737, "as": 0.88, "i": 0.175, "he": 0.054, "she": 0.015, "they": 0.152, "we": 0.133, "you": 0.772, "be": 1.209, "at": 0.261, "by": 0.726, "this": 0.873, "had": 0.028, "not": 0.65, "but": 0.23, "from": 0.462, "or": 0.888, "have": 0.223, "an": 0.633, "which": 0.403, "so": 0.229, "if": 1.175, "there": 0.151, "what": 0.051, "all": 0.35, "my": 0.049, "would": 0.068, "can": 0.595, "their": 0.172, "about": 0.103, "just": 0.059, "also": 0.255, "very": 0.072, "really": 0.017, "because": 0.034, "then": 0.235, "more": 0.215, "when": 0.366, "like": 0.091, "do": 0.135, "some": 0.163, "these": 0.16, "been": 0.069, "could": 0.043, "into": 0.149, "than": 0.117, "only": 0.204, "such": 0.114, "while": 0.081, "however": 0.034, "our": 0.031, "me": 0.035, "will": 0.653, "are": 0.776, "were": 0.122}, "sd": {"the": 3.263, "of": 2.384, "and": 1.711, "to": 1.851, "a": 1.873, "in": 1.407, "that": 1.138, "is": 2.1, "was": 0.772, "it": 1.195, "for": 1.125, "on": 0.78, "with": 0.865, "as": 1.014, "i": 0.67, "he": 0.339, "she": 0.15, "they": 0.367, "we": 0.531, "you": 1.387, "be": 1.18, "at": 0.61, "by": 0.918, "this": 0.99, "had": 0.199, "not": 0.891, "but": 0.431, "from": 0.76, "or": 1.142, "have": 0.45, "an": 0.942, "which": 0.697, "so": 0.449, "if": 1.288, "there": 0.38, "what": 0.234, "all": 0.622, "my": 0.354, "would": 0.269, "can": 0.919, "their": 0.502, "about": 0.347, "just": 0.229, "also": 0.457, "very": 0.244, "really": 0.15, "because": 0.24, "then": 0.538, "more": 0.507, "when": 0.633, "like": 0.277, "do": 0.33, "some": 0.435, "these": 0.392, "been": 0.241, "could": 0.254, "into": 0.46, "than": 0.337, "only": 0.405, "such": 0.329, "while": 0.368, "however": 0.165, "our": 0.173, "me": 0.241, "will": 0.947, "are": 0.99, "were": 0.476}};
+function englishCoverage(text) { const p = profile(text); return Object.values(p.freq).reduce((a, b) => a + b, 0); }
+function compareStyles(known, unknown) {
+  const A = profile(known), B = profile(unknown);
+  const z = p => FW.map(w => (p.freq[w] - FW_STATS.mu[w]) / FW_STATS.sd[w]);
+  const za = z(A), zb = z(B);
+  const delta = za.reduce((s, x, i) => s + Math.abs(x - zb[i]), 0) / FW.length;
+  const a = A.style, b = B.style, diffs = [];
+  const ratio = (x, y) => (Math.max(x, y) + 0.3) / (Math.min(x, y) + 0.3);
+  const say = (cond, txt) => { if (cond) diffs.push(txt); };
+  say(ratio(a.sentLen, b.sentLen) > 1.35, `Average sentence length: ${a.sentLen.toFixed(0)} words in the known writing vs ${b.sentLen.toFixed(0)} in the text being checked.`);
+  say(Math.abs(a.sentVar - b.sentVar) > 0.2, `Sentence lengths ${a.sentVar > b.sentVar ? "vary much more in the known writing" : "vary much more in the text being checked"}.`);
+  say(ratio(a.contr, b.contr) > 2 && Math.max(a.contr, b.contr) > 1, `Contractions (don't, it's…): ${a.contr.toFixed(1)} vs ${b.contr.toFixed(1)} per 100 words.`);
+  say(ratio(a.firstPerson, b.firstPerson) > 2.5 && Math.max(a.firstPerson, b.firstPerson) > 1, `"I / me / my": ${a.firstPerson.toFixed(1)} vs ${b.firstPerson.toFixed(1)} per 100 words.`);
+  say(Math.abs(a.wordLen - b.wordLen) > 0.45, `Average word length: ${a.wordLen.toFixed(1)} vs ${b.wordLen.toFixed(1)} letters. ${a.wordLen < b.wordLen ? "The text being checked uses longer words." : "The known writing uses longer words."}`);
+  say(Math.abs(a.mattr - b.mattr) > 0.06, `Vocabulary variety: ${(a.mattr * 100).toFixed(0)} vs ${(b.mattr * 100).toFixed(0)} different words per 100.`);
+  say(ratio(a.commas, b.commas) > 1.8, `Commas: ${a.commas.toFixed(1)} vs ${b.commas.toFixed(1)} per 100 words.`);
+  say(ratio(a.dashes, b.dashes) > 3 && Math.max(a.dashes, b.dashes) > 0.4, `Dashes: ${a.dashes.toFixed(1)} vs ${b.dashes.toFixed(1)} per 100 words.`);
+  say(ratio(a.excl + a.ques, b.excl + b.ques) > 3 && Math.max(a.excl + a.ques, b.excl + b.ques) > 0.5, `Exclamation and question marks: ${(a.excl + a.ques).toFixed(1)} vs ${(b.excl + b.ques).toFixed(1)} per 100 words.`);
+  let level;
+  if (diffs.length <= 1 && delta < 0.75) level = "similar";
+  else if (diffs.length >= 3 || (diffs.length >= 2 && delta > 0.8)) level = "very different";
+  else level = "somewhat different";
+  return { delta, level, diffs, nA: A.n, nB: B.n };
+}
+// ==/CORE==
+
+if (typeof document !== "undefined") {
+  const $ = id => document.getElementById(id);
+  const escH = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : (many || one + "s"));
+  const toneOf = s => s < BANDS.human ? "human" : s < BANDS.ai ? "mixed" : "ai";
+
+  const H_JEROME = "There were four of us, George, and William Samuel Harris, and myself, and Montmorency. We were sitting in my room, smoking, and talking about how bad we were, bad from a medical point of view I mean, of course. We were all feeling seedy, and we were getting quite nervous about it. Harris said he felt such extraordinary fits of giddiness come over him at times, that he hardly knew what he was doing; and then George said that he had fits of giddiness too, and hardly knew what he was doing. With me, it was my liver that was out of order. I knew it was my liver that was out of order, because I had just been reading a patent liver-pill circular, in which were detailed the various symptoms by which a man could tell when his liver was out of order. I had them all.";
+  const H_THOREAU = "When I wrote the following pages, or rather the bulk of them, I lived alone, in the woods, a mile from any neighbor, in a house which I had built myself, on the shore of Walden Pond, in Concord, Massachusetts, and earned my living by the labor of my hands only. I lived there two years and two months. At present I am a sojourner in civilized life again. I should not obtrude my affairs so much on the notice of my readers if very particular inquiries had not been made by my townsmen concerning my mode of life, which some would call impertinent, though they do not appear to me at all impertinent, but, considering the circumstances, very natural and pertinent. Some have asked what I got to eat; if I did not feel lonesome; if I was not afraid; and the like.";
+  const A_IND = "The Industrial Revolution marked a pivotal turning point in human history, fundamentally transforming the way people lived and worked. Beginning in Britain in the late eighteenth century, it saw the rise of mechanized production, the growth of factories, and the rapid expansion of cities. These changes brought about significant economic growth, yet they also created new social challenges, including harsh working conditions, child labor, and overcrowded urban slums. Furthermore, the period laid the foundation for modern capitalism and global trade networks. While historians continue to debate its long-term impacts, there is no doubt that the Industrial Revolution reshaped society in profound and lasting ways, setting the stage for the technological advancements that define the modern world.";
+  const LAB_SAMPLES = "Claude\nShort answer: a heat pump moves heat rather than making it. That's why it can deliver three or four units of heat for every unit of electricity it uses.\n\nHere's how it works. A refrigerant absorbs heat from the outside air, even on cold days. A compressor squeezes that refrigerant, which raises its temperature. The hot refrigerant then releases its heat inside your home.\n\nA few things affect how well it performs:\n- The outdoor temperature. Efficiency drops as it gets colder.\n- Insulation. A leaky house loses the heat as fast as the pump supplies it.\n- Sizing. An undersized unit runs constantly and still struggles.\n\nFor example, in Brisbane's mild winters a reverse-cycle air conditioner is usually the cheapest way to heat a room. In short, it's efficient because it relocates heat instead of generating it.\n---\nClaude\nThis matters more than most people realise. When you skip sleep before an exam, you don't just feel tired. Your brain also has less time to consolidate what you studied.\n\nSleep is when memories move from short-term to long-term storage. Cut it short and some of that transfer doesn't happen. For example, students who sleep eight hours after studying tend to recall more the next day than students who stay up revising.\n\nSo the trade-off is real. An extra two hours of cramming at midnight often costs more than it gains. A better plan is to stop at a set time, review your key points once, and go to bed.\n\nIn short, sleep is part of studying, not a break from it.\n---\nClaude\nThe lighthouse had been dark for eleven years when Nora climbed the stairs again. Each step creaked under her boots. At the top, she paused and stared at the old lamp, its glass clouded with salt.\n\nFor a long moment, she didn't move. Then she wiped the lens with her sleeve. Something shifted inside her as the grey light of morning came through.\n\nHer father had kept this light for thirty years. She had left the island at eighteen and promised herself she wouldn't come back. Now she was here, holding his keys.\n\n\"Still here,\" she said quietly.\n\nThat night, for the first time in years, a beam swept across the water. Nora watched it from the window and smiled.\n---\nClaude\nHi Ms Patel,\n\nThanks for your feedback on my draft. I've made the changes you suggested.\n\nI moved the evidence about rainfall into the second paragraph, so the argument builds more clearly. I also cut the quote from the introduction, since it repeated the thesis. The conclusion is now shorter and focuses on the main point.\n\nOne question: should the bibliography follow APA 7 or the school's own format? I've used APA for now.\n\nThanks again for your help.\n\nKind regards,\nSam\n---\nClaude\nChoosing between a laptop and a tablet for school mainly comes down to what you write and how you work.\n\nA laptop is the better fit if you write long essays, use spreadsheets or need specific software. The keyboard and full operating system make longer tasks easier.\n\nA tablet suits you if you mostly read, take handwritten notes or annotate PDFs. It's lighter and the battery usually lasts longer.\n\nA few practical tips:\n1. Check what software your school requires.\n2. Try typing on a tablet keyboard before you buy one.\n3. Consider a refurbished laptop if your budget is tight.\n\nIn summary, choose a laptop for writing-heavy work and a tablet for reading and note-taking.\n---\nChatGPT\n## The Benefits of Learning a Second Language\n\nLearning a second language offers a wide range of benefits that extend far beyond simple communication.\n\n**1. Cognitive Benefits:** Studies show that bilingual individuals often demonstrate improved memory, problem-solving skills, and mental flexibility.\n\n**2. Career Opportunities:** In today's globalized economy, employers increasingly value candidates who can communicate across cultures.\n\n**3. Cultural Understanding:** Learning a language provides deeper insights into the traditions, values, and perspectives of other communities.\n\n**4. Travel Experiences:** Speaking the local language can transform a trip, allowing for more authentic and meaningful connections.\n\nOverall, learning a second language is a valuable investment in personal and professional growth. If you want, I can also suggest some effective strategies for getting started!\n---\nChatGPT\nCertainly! Here's a breakdown of how photosynthesis works:\n\n### What Is Photosynthesis?\nPhotosynthesis is the process plants use to convert light energy into chemical energy, such as glucose.\n\n### Key Stages\n- **Light-dependent reactions:** These take place in the thylakoid membranes, where sunlight is used to produce ATP and NADPH.\n- **Calvin cycle:** This occurs in the stroma, where carbon dioxide is fixed into sugar using the energy from ATP and NADPH.\n\n### Why It Matters\nPhotosynthesis not only fuels plant growth but also produces the oxygen we breathe, making it essential for life on Earth.\n\nWould you like me to create a simple diagram or a set of revision questions on this topic?\n---\nChatGPT\nSubject: Follow-Up on Project Timeline\n\nHi Jordan,\n\nI hope this email finds you well. I wanted to follow up on our recent conversation regarding the project timeline.\n\nAfter reviewing the current progress, it appears that we may need to adjust the delivery date for the final report. The additional time would allow us to ensure the quality and accuracy of the data analysis, which is crucial for the success of the project.\n\nPlease let me know if you have any questions or concerns, and I would be happy to discuss this further at your convenience.\n\nThank you for your time and consideration.\n\nBest regards,\nAlex\n---\nChatGPT\nThe old clockmaker's shop sat at the end of a quiet cobblestone street, its windows glowing with a warm, golden light. Inside, hundreds of clocks ticked in perfect harmony, filling the air with a gentle, rhythmic melody.\n\nElias had spent his entire life among these clocks. Each one held a story\u2014a memory of the people who had brought them in, hoping to restore what time had worn away.\n\nOne rainy evening, a young girl stepped through the door, clutching a tiny silver pocket watch. \"It was my grandfather's,\" she whispered. \"It stopped the day he passed away.\"\n\nElias took the watch gently, his weathered hands trembling slightly. As he opened it, he realized it was a watch he had made decades ago\u2014a gift for his oldest friend.\n\nIn that moment, he understood that some things are never truly broken; they are simply waiting for the right hands to bring them back to life.\n---\nChatGPT\nSocial media has had a profound impact on teenagers, shaping the way they communicate, learn, and see themselves. On one hand, platforms like Instagram and TikTok allow young people to connect with friends, express their creativity, and access a wide variety of information. On the other hand, excessive use has been linked to anxiety, poor sleep, and low self-esteem.\n\nExperts suggest that the key lies in balance. Parents and educators can play a crucial role by encouraging healthy habits, such as setting screen-time limits and promoting offline activities. At the same time, teenagers themselves can benefit from developing digital literacy skills that help them navigate online spaces responsibly.\n\nUltimately, social media is neither entirely good nor entirely bad\u2014it is a tool, and its impact depends on how it is used.\n---\nChatGPT\nhonestly the new school timetable is kind of a mess lol. we've got double maths first thing on monday which is just cruel, and then PE straight after lunch on wednesday so everyone feels sick. I get that they had to fit in the new electives but I think they could've planned it a bit better. my friends and I have been talking about it heaps and we all kind of agree. at the end of the day though, it's only one term, so we'll survive. it's all about balance, you know?\n---\nHuman\nok so we went to the shops after school and the bus was SO late. like 40 mins late. jess was meant to get picked up at 4 but her mum ended up driving all the way to westfield to get her which was kinda funny bc she was not happy lol. anyway i got the shoes i wanted finally!! they were on sale too so mum cant complain. got heaps of homework tho, the english essay is due friday and i havent even started\n---\nHuman\nHey mate, just checking you're still right for Saturday? Footy starts at 2 so if we leave mine around 12:30 we should get parking. Bring a jacket, it's meant to be freezing. Also Dave's coming now, he'll meet us there. Let me know if anything changes. Cheers\n---\nHuman\nMinutes, P&C meeting, 14 October\n\nPresent: J. Nguyen (chair), R. Smith, T. Brown, K. Ali, 6 parents.\nApologies: M. Lee.\n\n1. Tuckshop: new supplier from Term 4. Prices rise 20c on most items. Approved.\n2. Fete: date set for Sat 22 November. Need volunteers for the BBQ and the book stall. K. Ali to send sign-up sheet.\n3. Car park: complaints about double parking at pick-up. R. Smith to raise with the principal and council.\n4. Treasurer report: balance $8,412.30. Uniform shop made $1,140 profit in Term 3.\n\nNext meeting 11 November, 7pm, library.\n---\nHuman\nThe experiment measured how temperature affects the rate of reaction between sodium thiosulfate and hydrochloric acid. Five temperatures were tested: 20, 30, 40, 50 and 60 degrees Celsius. At each temperature the time for the cross to disappear was recorded three times and an average was calculated. The results showed that the reaction time decreased as temperature increased, from 84 seconds at 20 degrees to 11 seconds at 60 degrees. This supports the hypothesis that higher temperatures increase the rate of reaction because particles collide more often and with more energy. One source of error was judging exactly when the cross disappeared, which was different for each person.\n---\nHuman\nMy name is Minh and I come from Vietnam. I am living in Brisbane for two years now. In my country, the school start at 7 o'clock in the morning and finish at 11:30. After that we go home for lunch and sleep. Here the school is very different. We stay all day and we have many sport. At first it was difficult for me because my English is not good. But my friends help me and the teachers are kind. Now I like my school very much. I want to be a engineer in the future because I like maths and building things.\n---\nHuman\nI've been thinking about the trip a lot, and I still can't decide. Part of me wants to go, because I'll probably never get another chance to see Japan with the whole family together. Grandma is 84 now. But the flights are expensive and I'd miss two weeks of school right before exams, which is the worst timing possible. Mum says I can take my books, but let's be real, I'm not studying on a bullet train. I'll talk to Mr Harris tomorrow and see what he says about the maths assessment. If he says I can do it early, I'm going.\n---\nHuman\nThe match was a disaster from the first whistle. We conceded in the third minute after Tom slipped on the wet grass, and it got worse from there. By half-time we were three down and the coach wasn't even angry anymore, just quiet, which was somehow worse. In the second half Liam finally scored from a corner, a scrappy goal that went in off his knee, and for about ten minutes we actually looked like a team. Then they scored twice more. 5-1. On the bus home nobody said much. Someone started playing music and someone else told them to turn it off.\n---\nHuman\nDear Sir/Madam,\n\nI am writing to complain about the late delivery of my order (No. 48213), which was due on 3 September and arrived on 19 September. When it finally arrived, the box was damaged and one of the two chairs had a broken leg.\n\nI phoned your customer service line twice, on 8 and 12 September, and was told both times that the order was \"on its way\". Nobody contacted me about the delay.\n\nI would like a refund for the damaged chair and the $25 delivery fee. Please reply within 14 days.\n\nYours faithfully,\nKaren Walsh\n---\nHuman\nThings to pack for camp:\n- sleeping bag\n- pillow (the small one)\n- torch + spare batteries\n- 2 jumpers, it gets cold at night\n- raincoat\n- water bottle\n- sunscreen, hat\n- medicine, ask mum\n- phone charger (prob no power there tho)\n- snacks!!! not nuts, nut free camp";
+  const labBlocks = LAB_SAMPLES.split(/\n-{3,}\n/);
+  const SAMPLES = {
+    claude: labBlocks[1].split("\n").slice(1).join("\n"),
+    chatgpt: labBlocks[6].split("\n").slice(1).join("\n"),
+    classic: "Social media has become an integral part of modern life, fundamentally reshaping the way people communicate and connect. Moreover, it plays a crucial role in fostering a sense of community among diverse groups, enabling individuals to share experiences across borders. However, it is important to note that excessive use can have significant effects on mental health, particularly among young people. Furthermore, the rapid spread of misinformation presents a multifaceted challenge for society, underscoring the need for robust digital literacy. Additionally, privacy concerns continue to shape the ongoing debate about regulation. Ultimately, navigating the complexities of the digital landscape requires a balanced approach. In conclusion, while social media offers numerous benefits, it is essential to harness its potential responsibly and thoughtfully.",
+    mixed: [H_JEROME, H_THOREAU, A_IND, "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this."].join("\n\n"),
+    human: H_JEROME
+  };
+
+  // ---------- tabs ----------
+  document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+    document.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "panel-" + t.dataset.tab));
+  });
+
+  // ---------- word counts ----------
+  const counters = { input: "count", known: "countK", unknown: "countU" };
+  const updateCount = id => { if (counters[id]) $(counters[id]).textContent = plural(nWords($(id).value), "word"); };
+  Object.keys(counters).forEach(id => $(id).addEventListener("input", () => updateCount(id)));
+
+  // ---------- file upload ----------
+  let uploadTarget = "input";
+  document.querySelectorAll("[data-upload]").forEach(b => b.onclick = () => { uploadTarget = b.dataset.upload; $("file").value = ""; $("file").click(); });
+  async function readDocx(file) {
+    if (typeof JSZip === "undefined") throw new Error("The .docx reader didn't load. Copy and paste the text instead.");
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const xml = await zip.file("word/document.xml").async("string");
+    const doc = new DOMParser().parseFromString(xml, "application/xml");
+    const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    return [...doc.getElementsByTagNameNS(W, "p")].map(p => {
+      let s = "";
+      for (const n of p.getElementsByTagNameNS(W, "*")) { if (n.localName === "t") s += n.textContent; else if (n.localName === "tab") s += " "; else if (n.localName === "br") s += "\n"; }
+      return s;
+    }).filter(s => s.trim()).join("\n\n");
+  }
+  $("file").onchange = async () => {
+    const f = $("file").files[0]; if (!f) return;
+    const msgEl = { input: $("msg"), lab: $("msgL") }[uploadTarget] || $("msgC");
+    msgEl.className = "msg"; msgEl.textContent = "";
+    try {
+      let text;
+      if (/\.docx$/i.test(f.name)) text = await readDocx(f);
+      else if (/\.(txt|md)$/i.test(f.name) || f.type.startsWith("text/")) text = await f.text();
+      else throw new Error("Only .txt and .docx files can be read here. For a PDF or Google Doc, copy and paste the text.");
+      $(uploadTarget).value = text; updateCount(uploadTarget);
+      msgEl.className = "msg info"; msgEl.textContent = `Loaded ${f.name} (${plural(nWords(text), "word")}).`;
+    } catch (e) { msgEl.textContent = e.message || "Couldn't read that file."; }
+  };
+
+  // ---------- full analysis of one text ----------
+  function fullAnalysis(raw) {
+    const cl = cleanText(raw);
+    const text = cl.text;
+    const r = analyze(text);
+    if (r.tooShort) return { tooShort: true, wc: r.wc };
+    r.text = text; r.cleanNotes = cl.notes;
+    r.attr = attribute(text, r);
+    r.win = slidingWindow(text);
+    r.segs = segments(text).filter(s => s.score != null);
+    r.cautions = cautions(r);
+    if (r.f.tooClean) r.cautions.push("This text sounds casual but is unusually tidy (no slips, even rhythm, neat ending). Some careful human writers write like this, so don't read much into that clue alone.");
+    if (r.win && r.win.max >= 70 && r.win.min <= 35 && r.band !== "ai") r.band = "mixed";
+    if (r.segs.length >= 2) { const hi = Math.max(...r.segs.map(s => s.score)), lo = Math.min(...r.segs.map(s => s.score)); if (hi >= 65 && lo <= 35 && r.band !== "ai") r.band = "mixed"; }
+    r.english = englishCoverage(text);
+    return r;
+  }
+  const BAND_TEXT = {
+    human: ["Human-leaning", "human", "Few known AI habits. AI text written in a plain or casual style can still score this low, so this isn't proof a person wrote it."],
+    inconclusive: ["Inconclusive", "mixed", "Not enough evidence either way. Plenty of human writing and plenty of lightly edited AI writing land here."],
+    mixed: ["Mixed: part of it stands out", "mixed", "Most of the text looks human-leaning, but at least one stretch shows many AI habits. See the section scan and the shaded sentences below."],
+    ai: ["AI-leaning", "ai", "Many habits that chatbots overuse. That's a reason to look closer, not proof."]
+  };
+
+  // ---------- explanation rows ----------
+  function describe(r) {
+    const c = r.counts, k = r.contrib;
+    const rhythm = (k.cv || 0) + (k.extreme || 0);
+    const ex = type => [...new Set(r.hits.filter(h => h.type === type).map(h => '"' + r.text.slice(h.start, h.end).trim().replace(/\s+/g, " ").slice(0, 40) + '"'))].slice(0, 4).join(", ");
+    const exLabel = re => [...new Set(r.hits.filter(h => h.type === "phrase" && re.test(h.label)).map(h => '"' + r.text.slice(h.start, h.end).trim().replace(/\s+/g, " ").slice(0, 40) + '"'))].slice(0, 3).join(", ");
+    return [
+      { v: k.hard, t: "Certain giveaways", d: `${c.hard} found: ${ex("hard")}.` },
+      { v: k.vocab, t: "Words AI over-uses (measured)", d: `${c.vocab} found: ${ex("word")}.` },
+      { v: k.phrase, t: "Stock phrases", d: `${c.phrase} found: ${exLabel(/^(?!fiction|email|vague)/) || ex("phrase")}.` },
+      { v: k.fiction, t: "Fiction clichés", d: `${c.fiction} found: ${exLabel(/fiction/)}.` },
+      { v: k.hopeEnd, t: "Tidy hopeful ending", d: "The story ends on a neat, hopeful note, which recent AI stories lean towards." },
+      { v: k.email, t: "Email boilerplate", d: `${c.eopen} stock opener(s) and ${c.eclose} stock closer(s): ${exLabel(/email/)}.` },
+      { v: k.negpar, t: "\"Not X, it's Y\" contrasts", d: `${c.negpar} found. Counts less than before, because recent Claude versions use fewer negations.` },
+      { v: k.frame, t: "Chatbot-style framing", d: `${plural(c.frame, "sentence")} opening like "The key is…", "Here's…" or "In short".` },
+      { v: k.part, t: "Trailing -ing clauses", d: `${c.part} found (", highlighting…"). AI uses these 2–5× more than people.` },
+      { v: k.trans, t: "Formal transition openers", d: `${c.trans} of ${c.sentences} sentences start with words like "Moreover" or "Additionally".` },
+      { v: k.summ, t: "Summary closer", d: "Ends with a recap such as \"In short\" or \"Overall\". Opus 5.5 does this about 10× more than Opus 5." },
+      { v: k.vague, t: "Vague attributions", d: `${c.vague} found: ${exLabel(/vague/)}. Who exactly?` },
+      { v: k.hedge, t: "Hedging", d: `${plural(c.hedge, "hedge")} ("may", "often", "typically", "it depends").` },
+      { v: k.praise, t: "Generic praise words", d: `${c.praise} words like "amazing", "valuable", "meaningful".` },
+      { v: k.fmt, t: "Bullets, headings and bold", d: `${c.bullets} bullet lines, ${c.headings} headings, ${c.bolds} bold phrases${c.emoji ? `, ${c.emoji} emoji` : ""}.` },
+      { v: k.colon, t: "Colons", d: `${c.colons} colons introducing a point.` },
+      { v: k.tri, t: "Rule-of-three lists", d: `${plural(c.tri, "list")} like "A, B, and C".` },
+      { v: k.dash, t: "Em dashes (weak, version-dependent)", d: `${plural(c.dashes, "em dash", "em dashes")}. Some models use many, others (like Claude Opus 5.5) almost none.` },
+      { v: k.lowSpec, t: "Few concrete specifics", d: `Few names, numbers or quotes (${c.specifics.toFixed(1)} per 100 words). Generic writing is a mild AI sign.` },
+      { v: k.even, t: "Overly even tone", d: `Sentence lengths${c.paras >= 3 ? " and paragraph lengths" : ""} are very uniform, with no exclamations or questions.` },
+      { v: k.tooClean, t: "Casual but too clean", d: "Sounds casual, yet has no slips at all, even rhythm and a neat moral or generic ending." },
+      { v: k.wrap, t: "Neat moral ending", d: "The last sentence wraps things up in a stock way." },
+      { v: rhythm, t: "Sentence rhythm", d: `${c.sentences} sentences, ${c.minLen}–${c.maxLen} words (average ${c.avgLen.toFixed(0)}, spread ${c.cv.toFixed(2)}). ${rhythm < -0.15 ? "Lengths vary a lot, which is more typical of people." : "Fairly even lengths."}` },
+      { v: k.slips, t: "Human slips and casual markers", d: `${c.slips} found (missing apostrophes, lowercase "i", slang, "!!").` }
+    ];
+  }
+
+  function renderAttr(r) {
+    const a = r.attr;
+    if (r.score < 45 && !r.counts.hard) {
+      $("attr").innerHTML = `<p class="none" style="margin:4px 0 0">Not enough AI-like signs to compare chatbot styles. (Model clues found anyway: Claude ${a.claude.toFixed(1)}, ChatGPT ${a.gpt.toFixed(1)}.)</p>`;
+      return;
+    }
+    const total = a.claude + a.gpt;
+    const pos = total ? 50 + (a.gpt - a.claude) / Math.max(total, 4) * 50 : 50;
+    const head = a.lean === "claude" ? ["Claude-leaning", "var(--claude)"] : a.lean === "chatgpt" ? ["ChatGPT-leaning", "var(--gpt)"] : ["Other model, or can't tell", "var(--muted)"];
+    const note = a.lean === "chatgpt" ? "Many other models (Gemini, Grok, DeepSeek, Llama and others) write in a similar way, partly because they were trained on ChatGPT-style text. So this really means \"ChatGPT or a model like it\"."
+      : a.lean === "claude" ? "Based mostly on habits of recent Claude versions (Opus 5.5, Sonnet 5). Older and future versions write differently."
+      : total < 2 ? "Too few model-specific clues. The text could come from any model, or from a person." : "Clues point both ways. It could be either, another model, or edited text.";
+    $("attr").innerHTML = `<div class="verdict" style="color:${head[1]}">${head[0]}${a.confidence !== "none" ? ` <span class="pill">${a.confidence} confidence</span>` : ""}</div>
+      <div class="tug"><div class="marker" style="left:${pos}%"></div></div><div class="tug-lbl"><span>Claude</span><span>ChatGPT</span></div>
+      <p class="note" style="margin:8px 0 0">${escH(note)} This guess has only been checked on a handful of sample passages, so treat it as a hint.</p>
+      <div class="attr">
+        <div class="side"><b style="color:var(--claude)">Claude clues (${a.claude.toFixed(1)})</b>${a.ev.claude.length ? `<ul>${a.ev.claude.map(x => `<li>${escH(x)}</li>`).join("")}</ul>` : `<span class="none">None found</span>`}</div>
+        <div class="side"><b style="color:var(--gpt)">ChatGPT clues (${a.gpt.toFixed(1)})</b>${a.ev.gpt.length ? `<ul>${a.ev.gpt.map(x => `<li>${escH(x)}</li>`).join("")}</ul>` : `<span class="none">None found</span>`}</div>
+      </div>`;
+  }
+
+  function renderMarked(r) {
+    const text = r.text;
+    const tints = r.win ? r.win.sentences.filter(s => s.score != null && s.score >= 65).map(s => [s.start, s.end]) : [];
+    $("tintNote").textContent = tints.length ? "Shaded sentences sit in a stretch that scored 65+ on its own." : "";
+    const cuts = new Set([0, text.length]);
+    r.hits.forEach(h => { cuts.add(h.start); cuts.add(h.end); });
+    tints.forEach(([a, b]) => { cuts.add(a); cuts.add(b); });
+    const pts = [...cuts].sort((a, b) => a - b);
+    let out = "";
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1]; if (a === b) continue;
+      let piece = escH(text.slice(a, b));
+      const h = r.hits.find(h => h.start <= a && h.end >= b);
+      if (h) piece = `<mark class="${h.type}" title="${escH(h.label)}">${piece}</mark>`;
+      if (tints.some(([s, e]) => s <= a && e >= b)) piece = `<span class="tint">${piece}</span>`;
+      out += piece;
+    }
+    $("marked").innerHTML = out;
+  }
+
+  let lastSummary = "";
+  function run() {
+    const msg = $("msg"); msg.className = "msg"; msg.textContent = "";
+    const r = fullAnalysis($("input").value);
+    if (r.tooShort) { $("result").classList.add("hide"); msg.textContent = `Only ${plural(r.wc, "word")}. There's too little to go on, so please paste at least 40 (150+ is better).`; return; }
+    if (r.english < 20) { msg.className = "msg info"; msg.textContent = "This doesn't look like English. The checker only knows English writing habits, so this score means very little."; }
+    $("result").classList.remove("hide");
+
+    // cleaning notice
+    const n = r.cleanNotes, parts = [];
+    if (n.hidden) parts.push(`${plural(n.hidden, "invisible character")} removed`);
+    if (n.homoglyphs) parts.push(`${plural(n.homoglyphs, "look-alike letter")} (such as a Cyrillic "о" inside an English word) swapped for normal letters`);
+    if (n.fullwidth) parts.push(`${plural(n.fullwidth, "full-width character")} converted`);
+    if (n.spaces) parts.push(`${plural(n.spaces, "unusual space")} normalised`);
+    $("cleanNote").classList.toggle("hide", !parts.length);
+    if (parts.length) $("cleanNote").innerHTML = `<b>The text was cleaned before checking:</b> ${escH(parts.join("; "))}.${n.homoglyphs ? " Look-alike letters are sometimes used on purpose to fool detectors." : ""}${n.hidden ? " Invisible characters can come from copying text out of some AI tools, websites or word processors." : ""}`;
+
+    const B = BAND_TEXT[r.band];
+    $("scoreNum").textContent = r.score;
+    $("scoreNum").style.color = `var(--${B[1]})`;
+    $("verdict").textContent = B[0];
+    $("verdictNote").textContent = r.counts.hard ? "Contains text a chatbot typically leaves behind when its answer is pasted in. See the red box above." : B[2];
+    $("confPill").textContent = r.wc < 120 ? "Low confidence: short text" : r.wc < 250 ? "Medium confidence" : "Higher confidence: long enough text";
+    $("marker").style.left = r.score + "%";
+
+    const hard = r.hits.filter(h => h.type === "hard");
+    $("giveaways").classList.toggle("hide", !hard.length);
+    if (hard.length) {
+      const items = [...new Map(hard.map(h => [h.label + r.text.slice(h.start, h.end), h])).values()].slice(0, 6);
+      $("giveaways").innerHTML = `<h2>Leftover chatbot text found</h2><p class="h2note" style="margin-bottom:8px">These lines are almost never written by people. They usually appear when a chatbot's reply is copied in without editing, though someone could also type or quote them on purpose.</p><ul class="diffs">${items.map(h => `<li><b>${escH(h.label)}:</b> "${escH(r.text.slice(h.start, h.end).trim().slice(0, 80))}"</li>`).join("")}</ul>`;
+    }
+
+    $("cautions").classList.toggle("hide", !r.cautions.length);
+    if (r.cautions.length) $("cautions").innerHTML = `<h2>Read the score with care</h2><ul class="diffs">${r.cautions.map(c => `<li>${escH(c)}</li>`).join("")}</ul>`;
+
+    renderAttr(r);
+
+    const rows = describe(r).filter(s => Math.abs(s.v || 0) > 0.02).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+    const max = Math.max(1.5, ...rows.map(s => Math.abs(s.v)));
+    $("signals").innerHTML = rows.length ? rows.map(s => {
+      const w = Math.min(50, Math.abs(s.v) / max * 50);
+      const style = s.v > 0 ? `left:50%;width:${w}%;background:var(--ai)` : `right:50%;width:${w}%;background:var(--human)`;
+      return `<div class="sig"><b>${escH(s.t)}</b><div class="push"><i style="${style}"></i></div><div class="d">${escH(s.d)}</div></div>`;
+    }).join("") + `<div class="push-lbl"><span>human</span><span>AI</span></div>` : `<p class="none">No signals either way.</p>`;
+
+    const segs = r.segs;
+    $("segCard").classList.toggle("hide", segs.length < 2);
+    if (segs.length >= 2) {
+      const total = segs.reduce((a, s) => a + (s.end - s.start), 0);
+      $("strip").innerHTML = segs.map((s, i) => `<div title="Section ${i + 1}: ${s.score}" style="flex:${(s.end - s.start) / total};background:var(--${toneOf(s.score)})">${s.score}</div>`).join("");
+      $("segs").innerHTML = segs.map((s, i) => `<div class="seg"><div class="badge" style="background:var(--${toneOf(s.score)})">${s.score}</div><div><b>Section ${i + 1}</b> · ${plural(nWords(r.text.slice(s.start, s.end)), "word")}<div class="note">${escH(r.text.slice(s.start, s.end).trim().slice(0, 140))}…</div></div></div>`).join("");
+      const hi = Math.max(...segs.map(s => s.score)), lo = Math.min(...segs.map(s => s.score));
+      if (hi >= 60 && hi - lo >= 30) $("segs").insertAdjacentHTML("afterbegin", `<p style="margin:0 0 8px;font-size:.92rem"><b>One part stands out:</b> it scores ${hi}, while the lowest-scoring part scores ${lo}. That's worth a closer look.</p>`);
+    }
+
+    renderMarked(r);
+
+    lastSummary = [
+      `AI Text Detector result: ${r.score}/100, ${B[0]} (${r.wc} words, ${$("confPill").textContent.toLowerCase()}).`,
+      r.score >= 45 || r.counts.hard ? `Model guess: ${r.attr.lean === "claude" ? "Claude-leaning" : r.attr.lean === "chatgpt" ? "ChatGPT-leaning (or a similar model)" : "can't tell"}${r.attr.confidence !== "none" ? ` (${r.attr.confidence} confidence)` : ""}.` : "",
+      ...rows.filter(s => s.v > 0.1).slice(0, 6).map(s => `+ ${s.t}: ${s.d}`),
+      ...rows.filter(s => s.v < -0.1).slice(0, 3).map(s => `- ${s.t}: ${s.d}`),
+      segs.length >= 2 ? `Sections: ${segs.map(s => s.score).join(", ")}` : "",
+      ...r.cautions.map(c => "Caution: " + c),
+      "Note: this checks for writing habits chatbots overuse. It is not proof of who wrote the text."
+    ].filter(Boolean).join("\n");
+    $("copy").textContent = "Copy summary";
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function copyText(btn, text, label) {
+    try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+    catch { btn.textContent = "Copy blocked: select the text instead"; }
+    setTimeout(() => btn.textContent = label, 2500);
+  }
+  $("copy").onclick = () => copyText($("copy"), lastSummary, "Copy summary");
+  $("go").onclick = run;
+  document.querySelectorAll("[data-sample]").forEach(b => b.onclick = () => { $("input").value = SAMPLES[b.dataset.sample]; updateCount("input"); run(); });
+  $("clear").onclick = () => { $("input").value = ""; updateCount("input"); $("result").classList.add("hide"); $("msg").textContent = ""; };
+
+  // ---------- compare ----------
+  function runCompare() {
+    const a = cleanText($("known").value).text, b = cleanText($("unknown").value).text;
+    const msg = $("msgC"); msg.className = "msg"; msg.textContent = "";
+    if (nWords(a) < 120 || nWords(b) < 120) { $("cresult").classList.add("hide"); msg.textContent = "Please paste at least 120 words in each box (300+ is much better)."; return; }
+    const r = compareStyles(a, b);
+    $("cresult").classList.remove("hide");
+    const v = { "similar": ["Styles look similar", "human"], "somewhat different": ["Styles are somewhat different", "mixed"], "very different": ["Styles are very different", "ai"] }[r.level];
+    $("cverdict").textContent = v[0]; $("cverdict").style.color = `var(--${v[1]})`;
+    const short = Math.min(r.nA, r.nB) < 300;
+    $("cnote").textContent = (r.level === "similar" ? "The two texts use small everyday words, sentences and punctuation in similar ways. That fits the same writer, but someone imitating them, or a chatbot told to copy their style, could match too." :
+      r.level === "very different" ? "The writing habits differ a lot. That can happen when someone else (or an AI) wrote the second text, but also between a rushed draft and polished work, or between different kinds of writing." :
+      "Some habits differ. This is common even for one writer across different topics, so on its own it means little.") + (short ? " At least one text is under 300 words, so treat this as rough." : "") + ` (Style distance ${r.delta.toFixed(2)}: same-writer pairs in testing were usually below 0.55.)`;
+    $("cdiffs").innerHTML = r.diffs.length ? r.diffs.map(d => `<li>${escH(d)}</li>`).join("") : "<li>No big differences in sentence length, contractions, punctuation or vocabulary.</li>";
+    const sa = analyze(a), sb = analyze(b);
+    $("cscores").innerHTML = [["Known writing", sa], ["Text to check", sb]].map(([n, s]) => s.tooShort ? "" : `<div class="seg"><div class="badge" style="background:var(--${toneOf(s.score)})">${s.score}</div><div><b>${n}</b><div class="note">${escH(BAND_TEXT[s.band][0])}</div></div></div>`).join("");
+  }
+  $("goCompare").onclick = runCompare;
+  $("sampleCompare").onclick = () => {
+    $("known").value = "Okay so I'll be honest, I didn't think I'd like Macbeth at all when we started it. Shakespeare always seemed kind of boring to me, like a bunch of old guys talking in riddles. But this play actually surprised me. Macbeth starts off as this brave soldier everyone respects, and then he hears one prophecy from some witches and basically loses his mind. What I found really interesting is Lady Macbeth. She's the one pushing him at first, but by the end she's the one who falls apart the worst, sleepwalking and trying to wash blood off her hands that isn't even there. I think the main message is that guilt eats away at you no matter how powerful you get. It made me think about how one bad choice can lead to so many more. My mum reckons Shakespeare is overrated but I don't know, I reckon this one holds up pretty well even now.";
+    $("unknown").value = SAMPLES.classic + " " + A_IND;
+    updateCount("known"); updateCount("unknown"); runCompare();
+  };
+
+  // ---------- test lab ----------
+  $("cut").oninput = () => { $("cutVal").textContent = $("cut").value; if (!$("lresult").classList.contains("hide")) runLab(); };
+  const LABEL_RE = /^\s*\[?\s*(human|claude|chatgpt|gpt|openai|ai|other)\s*\]?\s*:?\s*$/i;
+  let labCsv = "";
+  function runLab() {
+    const msg = $("msgL"); msg.className = "msg"; msg.textContent = "";
+    const raw = $("lab").value.replace(/\r\n?/g, "\n").trim();
+    if (!raw) { msg.textContent = "Paste some texts first, or load the sample passages."; return; }
+    const cut = +$("cut").value;
+    const blocks = raw.split(/\n\s*-{3,}\s*\n/).map(b => b.trim()).filter(Boolean);
+    const rows = [];
+    blocks.forEach((b, i) => {
+      const lines = b.split("\n");
+      let label = "Unlabelled";
+      const m = lines[0].match(LABEL_RE);
+      if (m) { lines.shift(); const l = m[1].toLowerCase(); label = l === "human" ? "Human" : l === "claude" ? "Claude" : /chatgpt|gpt|openai/.test(l) ? "ChatGPT" : "AI"; }
+      const text = lines.join("\n").trim();
+      const r = fullAnalysis(text);
+      if (r.tooShort) { rows.push({ i: i + 1, label, wc: r.wc, short: true, preview: text.slice(0, 60) }); return; }
+      const flagged = r.score >= cut;
+      const isAI = label !== "Human" && label !== "Unlabelled";
+      const det = label === "Unlabelled" ? null : (isAI ? flagged : !flagged);
+      const lean = r.attr.lean;
+      const mdl = (label === "Claude" || label === "ChatGPT") ? (lean === "unclear" ? "?" : (lean === label.toLowerCase())) : null;
+      rows.push({ i: i + 1, label, wc: r.wc, score: r.score, band: r.band, lean, conf: r.attr.confidence, det, mdl, preview: text.replace(/\s+/g, " ").slice(0, 70) });
+    });
+    const ok = rows.filter(r => !r.short);
+    const by = l => ok.filter(r => r.label === l);
+    const hum = by("Human"), ais = ok.filter(r => ["Claude", "ChatGPT", "AI"].includes(r.label));
+    const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "–";
+    const mean = a => a.length ? Math.round(a.reduce((s, r) => s + r.score, 0) / a.length) : "–";
+    const mdlRows = ok.filter(r => r.mdl !== null);
+    $("lsummary").innerHTML = `<h2>Summary at cut-off ${cut}</h2>
+      <table><tr><th>Group</th><th class="n">Texts</th><th class="n">Average score</th><th class="n">Flagged as AI</th></tr>
+      ${["Human", "Claude", "ChatGPT", "AI", "Unlabelled"].map(l => by(l)).map((g, j) => g.length ? `<tr><td>${["Human", "Claude", "ChatGPT", "Other AI", "Unlabelled"][j]}</td><td class="n">${g.length}</td><td class="n">${mean(g)}</td><td class="n">${pct(g.filter(r => r.score >= cut).length, g.length)}</td></tr>` : "").join("")}
+      </table>
+      <p style="margin:6px 0 0;font-size:.93rem"><b>Human texts wrongly flagged:</b> ${hum.length ? `${hum.filter(r => r.score >= cut).length} of ${hum.length}` : "no human texts labelled"} · <b>AI texts caught:</b> ${ais.length ? `${ais.filter(r => r.score >= cut).length} of ${ais.length}` : "no AI texts labelled"} · <b>Model guessed right:</b> ${mdlRows.length ? `${mdlRows.filter(r => r.mdl === true).length} of ${mdlRows.length} (wrong ${mdlRows.filter(r => r.mdl === false).length}, can't tell ${mdlRows.filter(r => r.mdl === "?").length})` : "no Claude/ChatGPT labels"}</p>
+      ${rows.some(r => r.short) ? `<p class="note">${rows.filter(r => r.short).length} text(s) were under 40 words and skipped.</p>` : ""}
+      <p class="note" style="margin-bottom:0">Tip: drag the cut-off to see the trade-off. Lower catches more AI but flags more humans. Paste these results back to Claude to help tune the weights.</p>`;
+    const mark = v => v === null ? "" : v === "?" ? `<span class="note">can't tell</span>` : v ? `<span class="ok">✓</span>` : `<span class="bad">✗</span>`;
+    const leanTxt = r => r.lean === "claude" ? "Claude" : r.lean === "chatgpt" ? "ChatGPT" : "can't tell";
+    $("ltable").innerHTML = `<tr><th>#</th><th>Label</th><th class="n">Words</th><th class="n">Score</th><th>Result</th><th>Detected?</th><th>Looks like</th><th>Model?</th><th>Start of text</th></tr>` +
+      rows.map(r => r.short ? `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td colspan="5" class="note">too short</td><td class="note">${escH(r.preview)}</td></tr>` :
+        `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td class="n" style="color:var(--${toneOf(r.score)});font-weight:700">${r.score}</td><td>${BAND_TEXT[r.band][0].split(":")[0]}</td><td>${mark(r.det)}</td><td>${r.score >= 45 ? leanTxt(r) + (r.conf !== "none" ? ` <span class="note">(${r.conf})</span>` : "") : `<span class="note">–</span>`}</td><td>${mark(r.mdl)}</td><td class="note">${escH(r.preview)}…</td></tr>`).join("");
+    labCsv = ["#\tlabel\twords\tscore\tresult\tdetected\tlooks_like\tmodel_correct\tstart"].concat(rows.map(r => r.short ? `${r.i}\t${r.label}\t${r.wc}\t\ttoo short\t\t\t\t${r.preview}` : `${r.i}\t${r.label}\t${r.wc}\t${r.score}\t${r.band}\t${r.det === null ? "" : r.det ? "yes" : "no"}\t${leanTxt(r)}\t${r.mdl === null ? "" : r.mdl === "?" ? "unclear" : r.mdl ? "yes" : "no"}\t${r.preview}`)).join("\n") + `\ncut-off\t${cut}`;
+    $("countL").textContent = plural(blocks.length, "text");
+    $("lresult").classList.remove("hide");
+  }
+  $("goLab").onclick = runLab;
+  $("sampleLab").onclick = () => { $("lab").value = LAB_SAMPLES; runLab(); };
+  $("copyLab").onclick = () => copyText($("copyLab"), labCsv, "Copy results");
+}
+</script>
+</body>
+</html>
