@@ -6,7 +6,7 @@
 //   human  - student essays (IvyPanda), Reddit WritingPrompts stories, Reuters news,
 //            and essays by English learners (ETS/TOEFL, Lang-8, PELIC, BAWE).
 //   ai     - ChatGPT (gpt-3.5-turbo) and Claude (2023 versions) answering the same prompts.
-// Files numbered 1-150 (news: 1-3 per author) are the "tune" half; the rest are "holdout".
+// Files numbered 1-150 and 301-600 (news: 1-3 per author) are the "tune" part; 151-300 and 601-900 are "holdout".
 // Change weights only while looking at "tune", then check "holdout" once.
 const path = require("path");
 const fs = require("fs");
@@ -18,8 +18,9 @@ const split = process.argv[2] || "all";
 const cut = +(process.argv[3] || E.BANDS.ai);
 const GROUPS = [
   ["human", "essay/human"], ["human", "wp/human"], ["human", "reuter/human"],
-  ["human", "other/ets"], ["human", "other/lang8"], ["human", "other/pelic"], ["human", "other/toefl91"], ["human", "other/bawe"],
-  ["ai", "essay/gpt"], ["ai", "essay/claude"], ["ai", "wp/gpt"], ["ai", "wp/claude"], ["ai", "reuter/gpt"], ["ai", "reuter/claude"]
+  ["human", "other/ets"], ["human", "other/lang8"], ["human", "other/pelic"], ["human", "other/toefl91"], ["human", "other/bawe"], ["human", "other/gptzero/human"],
+  ["ai", "essay/gpt"], ["ai", "essay/claude"], ["ai", "wp/gpt"], ["ai", "wp/claude"], ["ai", "reuter/gpt"], ["ai", "reuter/claude"],
+  ["ai", "other/gptzero/gpt"], ["ai", "other/undetectable"]   // undetectable = AI news run through a "humaniser" tool
 ];
 function files(dir) {
   const out = [];
@@ -30,7 +31,7 @@ function files(dir) {
 function inSplit(file, group) {
   if (split === "all") return true;
   const n = parseInt(path.basename(file), 10);
-  const tune = group.startsWith("reuter/") ? n <= 3 : n <= 150;
+  const tune = group.startsWith("reuter/") ? n <= 3 : n <= 150 || (n >= 301 && n <= 600);
   return split === "tune" ? tune : !tune;
 }
 const res = { human: [], ai: [] }, worst = [];
@@ -44,6 +45,7 @@ for (const [kind, g] of GROUPS) {
     const r = E.analyze(text);
     if (r.tooShort) continue;
     scores.push(r.score);
+    if (kind === "ai" && r.band === "edited") sus["edited AI?"] = (sus["edited AI?"] || 0) + 1;
     if (kind === "ai" && r.score >= cut) { const a = E.attribute(text, r); lean[a.lean]++; const v = E.suspect(text, r, a).short; sus[v] = (sus[v] || 0) + 1; }
     if (kind === "human" && r.score >= 45) worst.push([r.score, path.relative(root, f)]);
     if (verbose && kind === "ai" && r.score < 35) console.log("  missed", r.score, path.relative(root, f));

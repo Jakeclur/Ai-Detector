@@ -1,6 +1,6 @@
 // ==CORE==
 /* =====================================================================
-   AI Text Detector engine (v8). Rules only: no trained text model, no network.
+   AI Text Detector engine (v9). Rules only: no trained text model, no network.
    Evidence sources (see the page's "research" section):
    - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
    - Reinhart et al., PNAS 2025 (participial clauses etc.)
@@ -203,7 +203,8 @@ function features(text) {
 
   // measured AI words
   let vocab = 0, vocabN = 0;
-  // each word counts at most twice, and everyday tier-1 words (common in student essays) count half
+  // each word counts at most twice, everyday tier-1 words (common in student essays) count half,
+  // and a single lone AI word counts 40% (one "intricate" in a short story, or "underscores" in programming docs)
   const seenWord = {};
   scan(WORD_RE, m => { const lw = m[1].toLowerCase(); seenWord[lw] = (seenWord[lw] || 0) + 1; if (seenWord[lw] <= 2) { const wt = WORD_WEIGHT.get(lw) || 1; vocab += wt === 1 ? 0.5 : wt; } vocabN++; add(m.index, m.index + m[0].length, "word", "word AI over-uses (measured)"); });
 
@@ -308,6 +309,9 @@ function features(text) {
   // generic moral / summary ending
   const wrap = /\b(ultimately|in the end|at the end of the day|for generations|future generations|remains (?:a|one)|timeless|journey|key to|it depends|depends (?:on )?how|balance|made me (?:think|realise|realize)|taught me|reminder|worth (?:it|noticing|remembering)|you'll notice|give it|what matters|matters most|the (?:simple|little) things)\b/.test(lastS) ? 1 : 0;
 
+  // in-text citations "(Han 2)", "(Sharf, 2020)": in 65% of real student essays, 1-2% of chatbot essays (human sign)
+  const citeN = (text.match(/\((?:[A-Z][A-Za-z&.'-]+(?: et al\.?)?(?:,? (?:and|&) [A-Z][A-Za-z-]+)?,? (?:(?:19|20)\d\d[a-z]?|n\.d\.)(?:, p+\. ?\d+(?:-\d+)?)?|[A-Z][A-Za-z-]+ \d{1,4}(?:-\d+)?)\)/g) || []).length;
+  const cite = citeN >= 3 ? 1.5 : citeN >= 1 ? 1 : 0;
   // concrete specifics: digits, names mid-sentence, quoted speech
   const digits = (text.match(/\b\d[\d,.:%]*\b/g) || []).length;
   const names = (text.match(/(?<=[a-z,;] )[A-Z][a-z]{2,}/g) || []).length;
@@ -365,9 +369,9 @@ function features(text) {
   return {
     wc, ns, hits, sents,
     f: {
-      hard, vocab: per100(vocab), phrase: per100(phrase), negpar: negpar / ns, frame: frame / ns, part: part / ns, tri: tri / ns, trans: trans / ns,
+      hard, vocab: per100(vocab) * (Object.keys(seenWord).length >= 2 ? 1 : 0.4), phrase: per100(phrase), negpar: negpar / ns, frame: frame / ns, part: part / ns, tri: tri / ns, trans: trans / ns,
       summ, fiction: per100(fiction), hopeEnd, email, hedge: per100(hedge), vague: per100(vague), praise: per100(praise),
-      colon: per100(colons), dash: per100(dashes), fmt: per100(fmt), cv, extreme, slips: per100(slips), wrap, lowSpec, even, tooClean, shape
+      colon: per100(colons), dash: per100(dashes), fmt: per100(fmt), cv, extreme, slips: per100(slips), wrap, lowSpec, even, tooClean, shape, cite
     },
     counts: {
       hard, vocab: vocabN, phrase: phraseN, negpar, frame, part, tri, trans, summ, fiction, hopeEnd, email, eopen, eclose, hedge, vague, praise, colons, dashes,
@@ -375,7 +379,7 @@ function features(text) {
       maxLen: lens.length ? Math.max(...lens) : 0, slips: slipsN, casual, contr, specifics, digits, names, quotes, wrap, excl,
       spacedDash: (text.match(/\s—\s/g) || []).length, tightDash: (text.match(/\w—\w/g) || []).length,
       shapeN, shapeLabel, shapeList, shapeOpener, shapeWhy, shapeFrame, labels: labels.length,
-      edited, edHumanEv, edSkelEv
+      edited, edHumanEv, edSkelEv, citeN
     }
   };
 }
@@ -387,10 +391,10 @@ function features(text) {
 // each human text 3x and kept every clue's direction. The final weights are 70% hand-set + 30% fitted
 // (so they don't over-fit 2023-era chatbots), with the bias set so fewer humans are flagged than in v4.
 // See tests/eval_ghostbuster.js.
-const MODEL = { bias: -2.0, w: {
-  hard: 2.5, vocab: 0.59, phrase: 0.62, negpar: 2.49, frame: 3.0, part: 2.36, tri: 0.62, trans: 2.78,
-  summ: 0.65, fiction: 0.97, hopeEnd: 0.34, email: 0.56, hedge: 0.08, vague: 1.21, praise: 0.27,
-  colon: 0.14, dash: 0.29, fmt: 0.28, cv: -1.0, extreme: -2.21, slips: -0.87, wrap: 0.86, lowSpec: 0.27, even: 0.68, tooClean: 1.01, shape: 1.5
+const MODEL = { bias: -2.1, w: {
+  hard: 2.5, vocab: 0.8, phrase: 0.61, negpar: 2.47, frame: 2.99, part: 2.49, tri: 0.63, trans: 2.7, summ: 0.64,
+  fiction: 1.18, hopeEnd: 0.45, email: 0.63, hedge: 0, vague: 1.2, praise: 0.31, colon: 0.09, dash: 0.45, fmt: 0.31,
+  cv: -1, extreme: -2.21, slips: -0.85, wrap: 0.94, lowSpec: 0.02, even: 0.82, tooClean: 1.01, shape: 1.54, cite: -0.95
 }, cap: { shape: 3, hard: 3, vocab: 6, phrase: 6, negpar: 0.5, frame: 0.5, part: 0.6, tri: 0.6, trans: 0.5, fiction: 3, email: 4, hedge: 6, vague: 2, praise: 6, colon: 3, dash: 3, fmt: 6, slips: 6 } };
 
 function scoreFeatures(f) {
@@ -521,7 +525,7 @@ function slidingWindow(text, size = 90) {
 // including 12% of student essays. Now one paragraph (not the last, since conclusions naturally sound
 // like summaries) must score 70+ AND be 40+ points above the median of the other paragraphs.
 // Real humans labelled mixed: 5 of 2,046. Real essays with a pasted ChatGPT/Claude paragraph: 22 of 193.
-const MIXED_RULE = { para: 70, gap: 40, minParaWords: 40 };
+const MIXED_RULE = { para: 72, gap: 40, minParaWords: 40 };
 function mixedCheck(text, r) {
   const none = { mixed: false };
   if (r.tooShort || r.band === "ai") return none;

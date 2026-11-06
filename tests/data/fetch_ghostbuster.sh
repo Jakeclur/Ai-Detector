@@ -12,8 +12,9 @@ git clone -q --depth 1 --filter=blob:none --sparse https://github.com/vivek3141/
 cd "$tmp/repo"
 pats=()
 for d in essay/human essay/gpt essay/claude wp/human wp/gpt wp/claude other/ets other/lang8 other/pelic other/toefl91 other/bawe; do
-  for i in $(seq 1 300); do pats+=("$d/$i.txt"); done
+  for i in $(seq 1 900); do pats+=("$d/$i.txt"); done
 done
+pats+=("other/undetectable/*" "other/gptzero/*")
 for d in reuter/human reuter/gpt reuter/claude; do
   for i in 1 2 3 4 5 6; do pats+=("$d/*/$i.txt"); done
 done

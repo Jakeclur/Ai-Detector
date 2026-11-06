@@ -56,14 +56,14 @@ There is no AI model inside, and nothing you paste is sent anywhere.
   | 0–34 | Human-leaning |
   | 35–54 | Inconclusive |
   | 55–100 | AI-leaning |
-  | any | **Mixed**, when one paragraph (not the last) scores 70+ on its own and 40+ points above the median of the other paragraphs |
+  | any | **Mixed**, when one paragraph (not the last) scores 72+ on its own and 40+ points above the median of the other paragraphs |
 
   Short texts are pulled towards the middle, because less text means less evidence.
 - **Certain giveaways box:** leftover chatbot lines such as "As an AI language model", "Would you like me to…", "[Your Name]" or ChatGPT citation codes (`oaicite`, `utm_source=chatgpt.com`).
 - **Caution box:** warns when the text is formal, very plain, mostly a list, short, or casual-but-very-tidy, because careful human writing in those styles can look AI-like.
 - **Which AI does it look more like?** A Claude ↔ ChatGPT bar with the evidence for each side.
 - **Section by section:** each paragraph (or ~110-word chunk) scored on its own.
-- **Stand-out paragraph:** when one paragraph scores 70+ and 40+ points above the others, the result is "Mixed" and that paragraph is shaded in the flagged text.
+- **Stand-out paragraph:** when one paragraph scores 72+ and 40+ points above the others, the result is "Mixed" and that paragraph is shaded in the flagged text.
 - **Copy summary:** a plain-text summary of the result.
 
 ### Compare with known writing
@@ -145,6 +145,7 @@ The weights were set by hand from the research, then checked against a labelled 
 |---|---|
 | **Human slips** | Missing apostrophes ("dont", "im"), lowercase "i", lowercase sentence starts, slang ("lol", "ngl", "tbh"), "!!", double spaces, no full stop at the end |
 | **Sentence rhythm** | Very uneven sentence lengths, including very short (≤3 words) or very long (≥45 words) ones |
+| **In-text citations** | "(Smith, 2020)", "(Han 2)". In 65% of real student essays but only 1–2% of chatbot essays (v9). AI asked to "use APA referencing" could still add them, so the weight is moderate |
 
 ### Deliberately not used
 - **Vocabulary richness and word length.** These are what make commercial detectors flag non-native English writers (see [Fairness](#fairness)).
@@ -178,6 +179,27 @@ Each family has its own fingerprint clues. The detector adds them up and shows a
 ---
 
 ## How accurate is it?
+
+### v9: bigger real-world test
+The Ghostbuster download was extended to 900 files per group, plus 300 AI news articles run through the "undetectable.ai" humaniser and 149 human / 142 ChatGPT texts from the dataset's GPTZero comparison: **5,303 human and 4,635 AI texts**. Split: files 1–150 and 301–600 for tuning, 151–300 and 601–900 kept back.
+
+v9 changes: in-text citations as a human sign; a single lone AI word counts 40% (one "intricate" in a story, or "underscores" in programming docs, was enough to flag people); weights re-fitted on the bigger set (humans weighted 3×, every clue's direction kept, rhythm weights pinned so stories weren't hurt); Mixed threshold 70 → 72 to match.
+
+| | v8 | v9 |
+|---|---|---|
+| Humans wrongly flagged, all 5,303 | 33 (0.6%) | **15 (0.3%)** |
+| … student essays (894) | 24 | 11 |
+| … English learners (2,160) | 6 | 1 |
+| … stories, news, docs, GPTZero humans | 1 | 1 |
+| Humans flagged, kept-back half (2,590) | 13 | **8** |
+| AI caught, all 4,635 | 30.2% | **32.5%** |
+| AI caught, kept-back half (2,096) | 32.1% | **34.8%** |
+| ChatGPT stories caught | 37% | 47% |
+| Humaniser-tool AI news caught | 12% | 14% |
+| Humans labelled "Mixed" | 22 | 17 |
+| Own corpus / built-in samples / Opus 5.5 | 21 of 53 / 8 of 11 / 8 of 40 | 20 of 53 / 8 of 11 / 8 of 40 |
+
+No human group got more flags, "Mixed" labels or "edited AI" labels than in v8. Your own English essay still scores human-leaning.
 
 ### Real-world test (Ghostbuster dataset)
 The [Ghostbuster dataset](https://github.com/vivek3141/ghostbuster-data) (Verma et al., 2023, CC BY 3.0) has real human writing and real ChatGPT (gpt-3.5-turbo) and Claude (2023) output written for the same prompts. 2,056 human and 1,800 AI texts were used. Weights were tuned on one half and the other half was only used for checking.
@@ -233,7 +255,7 @@ v4 caught more of these (47% vs 40% overall), mostly through the "tidy hopeful e
 ### Mixed text
 **v8 fix, found with a real student's essay.** The old Mixed rule (any ~90-word window scoring 70+ while another scored 35 or less) would have labelled **76 of 2,056 real human texts** "Mixed": 37 of 299 student essays, 34 of 300 university essays, and the student's own English essay. Formal essays naturally have one stretch with "In conclusion" and a few ", evoking…" clauses, and single windows are too jumpy.
 
-The new rule needs one paragraph (not the last, since conclusions naturally read like summaries) to score **70+** on its own and sit **40+ points above** the median of the other paragraphs.
+The new rule needs one paragraph (not the last, since conclusions naturally read like summaries) to score **70+** (72+ since v9) on its own and sit **40+ points above** the median of the other paragraphs.
 
 | | Old rule | New rule |
 |---|---|---|
@@ -356,6 +378,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v6 | Studied 40 real Claude Opus 5.5 answers (v5 caught 0 of them). New "Opus 5.5 answer shape" clue (label-style paragraphs, colon lists, one-sentence openers, "that's why", "the good news is"); "if you paste…, I can…" offers. Opus 5.5 caught 0 → 8 of 40, with no extra humans flagged. New **Suspected AI** line on every result, with a version guess (Claude Opus 5.5, older Claude, ChatGPT GPT-5/6 or GPT-4-style). Single line breaks count as paragraphs when there are no blank lines. "Real Claude Opus 5.5 answer" sample button |
 | v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
 | v8 | Tested with a real student's English essay (thanks to the owner). It scored 28, "Human-leaning", but the old Mixed rule labelled it "Mixed", and the same rule hit 76 of 2,056 real human texts. **New Mixed rule:** one non-final paragraph 70+ and 40+ above the rest; shading now marks that whole paragraph. Humans labelled Mixed 76 → 6 of 2,262. Scores and AI-leaning results unchanged |
+| v9 | Bigger real-data test (5,303 human / 4,635 AI texts, incl. humaniser-tool output). In-text citations as a human sign; lone AI words count 40%; weights re-fitted; Mixed threshold 72. Humans flagged 33 → 15, AI caught 30% → 33%, with no human group getting worse |
 
 ---
 

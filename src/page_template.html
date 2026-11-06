@@ -109,7 +109,7 @@
   <h1>AI Text Detector</h1>
   <p class="sub">See how many known AI-writing habits a text shows, which chatbot it looks more like, and where the AI-like parts are. You can also compare it with someone's known writing, or test the detector on your own examples.</p>
 
-  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In tests on over 2,000 real human texts (including essays by people learning English) it wrongly flagged about 1 in 200, and it caught only about 1 in 4 real chatbot texts. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
+  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. In tests on over 5,000 real human texts (including essays by people learning English) it wrongly flagged about 1 in 350, and it caught only about 1 in 3 real chatbot texts. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
 
   <div class="tabs">
     <button class="tab on" data-tab="check">Check a text</button>
@@ -263,6 +263,7 @@ a Claude answer goes here…</pre>
 
   <details>
     <summary>How accurate is it?</summary>
+    <p><b>v9 update.</b> Re-tested on a bigger set: 5,303 real human texts and 4,635 AI texts, including 300 AI news articles run through a "humaniser" tool. Humans wrongly flagged: 33 → 15 (0.3%), and fewer in every group (English learners 6 → 1). AI caught: 30% → 33%. On the half kept back from tuning, humans flagged went 13 → 8 and AI caught went 32% → 35%. Text run through a humaniser tool is still mostly missed (14% caught).</p>
     <p><b>Real-world test.</b> I tested it on 2,056 real human texts and 1,800 real chatbot texts from the <a href="https://github.com/vivek3141/ghostbuster-data">Ghostbuster dataset</a>: student essays, Reddit short stories, Reuters news articles and essays by people learning English, plus ChatGPT and Claude (2023 versions) writing on the same topics. Half of it was kept back and only used for the final check. Results at the 55 cut-off:</p>
     <div class="tablewrap"><table>
       <tr><th>Kind of text</th><th class="n">Flagged as AI</th></tr>
@@ -280,7 +281,7 @@ a Claude answer goes here…</pre>
     <p><b>Own test set</b> (newer chatbot styles, all written by Claude): 0 of 216 human passages flagged; AI caught: classic ChatGPT-style essays 100%, modern answers about 33%, stories about 25%, emails about 13%, AI told to sound like a teenager about 10%. Any text with leftover chatbot lines ("As an AI language model", "[Your Name]", citation codes) is nearly always caught.</p>
     <p><b>Big caveat:</b> the real chatbot text is from 2023 models, which write differently from today's. The newer-style samples were all written by one AI (Claude), and the "ChatGPT-style" ones are imitations. Use the Test lab with your own real examples to find out how it does for you.</p>
     <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. On real 2023 Claude essays it sometimes said "ChatGPT-leaning" and never "Claude-leaning", because its Claude clues come from 2026 Claude versions. Treat it as a hint.</p>
-    <p><b>Mixed texts:</b> "Mixed" means one paragraph (not the last one) scores 70+ on its own and at least 40 points above the other paragraphs. A real student's essay showed that the old rule was far too jumpy: it would have labelled 76 of 2,056 real human texts "Mixed", including 12% of student essays. The new rule labels 6 of 2,262. On 193 real student essays with one real ChatGPT or Claude paragraph pasted in, it spots the pasted paragraph 24 times, so it misses most pasted paragraphs that aren't strongly AI-like.</p>
+    <p><b>Mixed texts:</b> "Mixed" means one paragraph (not the last one) scores 72+ on its own and at least 40 points above the other paragraphs. A real student's essay showed that the old rule was far too jumpy: it would have labelled 76 of 2,056 real human texts "Mixed", including 12% of student essays. The new rule labels 6 of 2,262. On 193 real student essays with one real ChatGPT or Claude paragraph pasted in, it spots the pasted paragraph 24 times, so it misses most pasted paragraphs that aren't strongly AI-like.</p>
     <p>Tools that run a real language model do much better. Pangram reports catching 99.7% of Claude Opus 5.5 answers. A page like this can't run such a model, and I haven't added one because I couldn't test it here.</p>
   </details>
 
@@ -295,7 +296,7 @@ a Claude answer goes here…</pre>
       <li><b>Fiction and email habits.</b> "For a long moment", "said quietly", "felt something shift", tidy hopeful endings, and email boilerplate such as "I hope this email finds you well" plus "Please don't hesitate to reach out".</li>
       <li><b>Too-clean casual text.</b> Text that sounds casual ("honestly", "kind of") but has no slips at all, even sentences and a neat moral at the end. Real people writing carefully can look like this, so it adds only a moderate amount and never decides the result alone.</li>
       <li><b>Version-aware clues.</b> Habits change between model versions. Pangram found Claude Opus 5.5 says "genuinely" 83% less than Opus 5, says "in short" 11× more, uses about 85% more bullets, and writes shorter, more even sentences. Em dashes almost vanished in Opus 5.5 but are still common in some GPT-5 output. So em dashes and "genuinely" now count for very little.</li>
-      <li><b>Human signs.</b> Missing apostrophes ("dont"), lowercase "i", slang, "!!", and very uneven sentence lengths lower the score.</li>
+      <li><b>Human signs.</b> Missing apostrophes ("dont"), lowercase "i", slang, "!!", very uneven sentence lengths, and in-text citations like "(Smith, 2020)" lower the score. Citations appear in 65% of real student essays but only 1–2% of chatbot essays (AI asked to "use APA referencing" could still add them).</li>
       <li><b>Text cleaning.</b> Invisible characters are removed, look-alike letters (for example a Cyrillic "о" hidden in an English word to fool detectors) are swapped back, and curly quotes are straightened before checking. You're told when this happens.</li>
     </ul>
     <p><b>Suspected AI.</b> Every result ends with a suspected AI: "No AI suspected", a model (Claude Opus 5.5, older Claude, ChatGPT GPT-5/6, older GPT-4-style ChatGPT, or "ChatGPT or a model like it"), or "can't tell". The version hint comes from habits that changed between releases, such as em dashes (common in older Claude, almost gone in Opus 5.5) and words like "delve" (GPT-4 era).</p>
@@ -429,6 +430,7 @@ if (typeof document !== "undefined") {
       { v: k.tooClean, t: "Casual but too clean", d: "Sounds casual, yet has no slips at all, even rhythm and a neat moral or generic ending." },
       { v: k.wrap, t: "Neat moral ending", d: "The last sentence wraps things up in a stock way." },
       { v: rhythm, t: "Sentence rhythm", d: `${c.sentences} sentences, ${c.minLen}–${c.maxLen} words (average ${c.avgLen.toFixed(0)}, spread ${c.cv.toFixed(2)}). ${rhythm < -0.15 ? "Lengths vary a lot, which is more typical of people." : "Fairly even lengths."}` },
+      { v: k.cite, t: "In-text citations", d: `${c.citeN} citation(s) like "(Smith, 2020)". 65% of real student essays have these, but only 1–2% of chatbot essays.` },
       { v: k.slips, t: "Human slips and casual markers", d: `${c.slips} found (missing apostrophes, lowercase "i", slang, "!!").` }
     ];
   }
