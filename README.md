@@ -3,6 +3,7 @@
 A rules-based AI-writing detector that runs entirely in your web browser. Paste some writing (or upload a `.txt` or `.docx` file) and it shows:
 
 - a 0–100 score for how many known AI-writing habits the text has, with a **Human-leaning / Inconclusive / Mixed / AI-leaning** result
+- a **Suspected AI** line at the end of every result: "No AI suspected", a model and version guess (e.g. *Claude Opus 5.5*, *older Claude*, *ChatGPT (GPT-5/6)*), or "can't tell"
 - **which chatbot it looks more like**, Claude or ChatGPT, with an honest confidence level
 - a **bar for every clue**, showing what pushed the score up or down
 - **highlights in the text**, so you can see exactly what was flagged and why
@@ -117,6 +118,7 @@ The weights were set by hand from the research, then checked against a labelled 
 | **Certain giveaways** | "As an AI language model", "Would you like me to…", "If you want, I can…", "Certainly!", "[Your Name]", ChatGPT citation codes, a "Copy code" line | Text left behind when a chatbot answer is pasted unedited. ("I hope this helps" used to be here, but real people write it too, so since v5 it's an ordinary stock phrase) |
 | **Measured AI words** | *delve, showcasing, underscores, tapestry, intricate, meticulous, dependable, steady, thoughtful, solace, newfound…* | Each word counts at most twice, and everyday words like "essential" or "unique" count half, because students use them too. Only words that studies **measured** against human writing: Kobak et al. (15M abstracts), Reinhart et al., and Graphite (Opus 5.5 uses "dependable" 23× the human rate). Blog-list favourites were cut, because Originality.ai found many (e.g. "delve") were rare in real ChatGPT output |
 | **Stock phrases** | "plays a crucial role", "it's important to note", "This matters" (116×), "Why X matters" (92×), "Looking ahead" (40×), "adds another layer" (27×), "rather than simply" (32×), "is more than a X, it…" (98×) | Wikipedia's *Signs of AI writing*; Graphite 2026 study of Opus 5.5 |
+| **Opus 5.5 answer shape** | 5 habits: label-style paragraphs ("Storage. Solar produces nothing at night…"), a colon line then a plain list, a one-sentence opening answer, "that's why", "the good news is" / "depends mostly on". Counts lightly for 2, strongly for 3+ | Measured on 26 real Opus 5.5 answers written for this project vs 2,281 human texts: 3+ together never appeared in human writing |
 | **Fiction clichés** | "for a long moment", "said quietly", "felt something shift", "paused", "stared", "in that moment", "weathered hands" | Pangram found these rose sharply in Opus 5.5 stories |
 | **Tidy hopeful ending** | Stories (text with dialogue or fiction clichés) that end on "smiled", "for the first time", "hope", "together"… | Pangram: Opus 5.5 stories lean towards hope, resilience and family |
 | **Email boilerplate** | "I hope this email finds you well", "I wanted to follow up", "Please don't hesitate to reach out", "Thank you for your time and consideration" | Common AI email openers and closers. Each counts only a little, more when an opener and closer appear together |
@@ -192,6 +194,21 @@ The [Ghostbuster dataset](https://github.com/vivek3141/ghostbuster-data) (Verma 
 
 On the half kept back for checking: humans wrongly flagged 6 → 3 (of 1,007), AI caught 22.4% → 24.0%.
 
+### Real Claude Opus 5.5 answers (`tests/data/opus55/`)
+40 answers written by Claude Opus 5.5 itself in a Claude Code session (explanations, advice, essays, stories, emails, a review, a cover letter, a speech and two "write like a teen" posts), split into 26 for tuning and 14 kept back. Plus 15 "human-refined" versions edited the way a student might (casual words, typos, personal details, structure removed). See `tests/data/opus55/prompts.md`.
+
+| Set | v5 flagged | v6 flagged | v6 average score |
+|---|---|---|---|
+| Opus 5.5, tuning (26) | 0 | **6** | 32 (v5: 18) |
+| Opus 5.5, kept back (14) | 0 | **2** | 28 (v5: 19) |
+| Human-refined Opus 5.5 (15) | 0 | 0 | 19 |
+
+- Every flagged Opus 5.5 answer got **Suspected AI: Claude Opus 5.5**. It never said ChatGPT for these.
+- What it catches: structured answers and explanations (vaccines, compound interest, study tips, renewable energy, inflation, Rome).
+- What it misses: Opus 5.5 stories, emails, essays and teen-style posts, and anything a person has re-edited. Their habits look like careful human writing.
+- Real human texts flagged: unchanged at 10 of 2,056, and still 0 of 216 and 0 of 9 in the other sets.
+- **Caveat:** the samples were written knowing they were for this detector, after reading its clue list, and the "human" edits were also written by Opus 5.5. Real Opus 5.5 answers from claude.ai would be a better test.
+
 ### Own test set
 216 real human passages, collected from text available offline: Python documentation, package READMEs, Go docs, Newton's *Opticks*, the GPL, and classic novels and speeches. Plus 53 AI passages in newer chatbot styles, all written by Claude, with 20 kept back for checking.
 
@@ -231,6 +248,7 @@ For comparison, Pangram, a commercial detector that runs a real AI model, report
 
 - **It misses most plain, edited or "humanised" AI text.** AI imitating a teen with lowercase starts and slang looks human to it.
 - **It's unreliable under about 150 words.**
+- **It misses most Claude Opus 5.5 text**: 8 of 40 real Opus 5.5 answers flagged, and none once a person has edited them.
 - **It misses most real chatbot text**: about 3 in 4 in the real-world test, and almost all Claude stories and news.
 - **Accuracy on today's chatbots is unknown.** The real chatbot test text is from 2023.
 - **The model guess is weak**: right on the imitations, but it never recognised real 2023 Claude text.
@@ -267,6 +285,7 @@ tests/
   eval_ghostbuster.js      ← score real human and real ChatGPT/Claude text (Ghostbuster dataset)
   data/
     fetch_ghostbuster.sh   ← downloads the Ghostbuster texts (not committed)
+    opus55/                ← 40 real Claude Opus 5.5 answers + 15 "human-refined" versions (Test lab format)
     make_dataset.py        ← assembles tests/data/dataset.json
     build_human.py         ← collects human prose from docs on the machine (not committed)
     extra_human.py         ← public-domain human passages (Austen, Twain, Lincoln…)
@@ -297,6 +316,11 @@ node tests/eval_corpus.js
 bash tests/data/fetch_ghostbuster.sh
 node tests/eval_ghostbuster.js tune       # look at this while changing weights
 node tests/eval_ghostbuster.js holdout    # check this at the end
+
+# real Claude Opus 5.5 answers
+node tests/lab.js tests/data/opus55/tune.txt
+node tests/lab.js tests/data/opus55/holdout.txt          # kept back for checking
+node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versions
 ```
 
 ### Tuning workflow
@@ -317,6 +341,7 @@ node tests/eval_ghostbuster.js holdout    # check this at the end
 | v3 | Certain giveaways, Markdown and hidden-character checks, section-by-section scan, Compare tab, .txt/.docx upload, English check, copy summary |
 | v4 | Text cleaning (hidden characters, look-alike letters, quotes); 2026 evidence (Opus 5.5, GPT-5.x/6); version-aware weights; structure clues (closers, hedging, vague attributions, praise words, colons, specifics, evenness); fiction, email and too-clean-casual clues; Claude vs ChatGPT attribution; inconclusive/mixed bands; sliding window; fairness cautions; Test lab tab |
 | v5 | Tested on real data (2,056 human and 1,800 ChatGPT/Claude texts from the Ghostbuster dataset). Fixed clues that wrongly flagged students and English learners ("I hope this helps" as a certain giveaway, "I think" as casual, hopeful endings in essays, lists of -ing words, repeated everyday words). Weights re-fitted (70% hand-set, 30% fitted). Humans flagged 19 → 10, real AI caught 23% → 25%. Added "Introduction:"-style labels and a few measured words. Fixed .docx error message and Test lab model check |
+| v6 | Studied 40 real Claude Opus 5.5 answers (v5 caught 0 of them). New "Opus 5.5 answer shape" clue (label-style paragraphs, colon lists, one-sentence openers, "that's why", "the good news is"); "if you paste…, I can…" offers. Opus 5.5 caught 0 → 8 of 40, with no extra humans flagged. New **Suspected AI** line on every result, with a version guess (Claude Opus 5.5, older Claude, ChatGPT GPT-5/6 or GPT-4-style). Single line breaks count as paragraphs when there are no blank lines. "Real Claude Opus 5.5 answer" sample button |
 
 ---
 

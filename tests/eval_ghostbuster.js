@@ -35,16 +35,16 @@ function inSplit(file, group) {
 }
 const res = { human: [], ai: [] }, worst = [];
 const verbose = process.env.VERBOSE;
-console.log("group              n  mean  inconcl  flagged   max   model guess (claude / chatgpt / unclear)");
+console.log("group              n  mean  inconcl  flagged   max   model guess for flagged texts (claude / chatgpt / unclear)   suspected AI");
 for (const [kind, g] of GROUPS) {
-  const scores = []; const lean = { claude: 0, chatgpt: 0, unclear: 0 };
+  const scores = []; const lean = { claude: 0, chatgpt: 0, unclear: 0 }; const sus = {};
   for (const f of files(path.join(root, g))) {
     if (!inSplit(f, g)) continue;
     const text = E.cleanText(fs.readFileSync(f, "utf8")).text;
     const r = E.analyze(text);
     if (r.tooShort) continue;
     scores.push(r.score);
-    if (kind === "ai") lean[E.attribute(text, r).lean]++;
+    if (kind === "ai" && r.score >= cut) { const a = E.attribute(text, r); lean[a.lean]++; const v = E.suspect(text, r, a).short; sus[v] = (sus[v] || 0) + 1; }
     if (kind === "human" && r.score >= 45) worst.push([r.score, path.relative(root, f)]);
     if (verbose && kind === "ai" && r.score < 35) console.log("  missed", r.score, path.relative(root, f));
   }
@@ -53,7 +53,7 @@ for (const [kind, g] of GROUPS) {
   const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
   const pct = x => (x / scores.length * 100).toFixed(0).padStart(4) + "%";
   console.log(g.padEnd(16), String(scores.length).padStart(4), mean.toFixed(0).padStart(5), pct(scores.filter(s => s >= E.BANDS.human && s < cut).length).padStart(8),
-    pct(scores.filter(s => s >= cut).length).padStart(8), String(Math.max(...scores)).padStart(5), kind === "ai" ? `   ${lean.claude} / ${lean.chatgpt} / ${lean.unclear}` : "");
+    pct(scores.filter(s => s >= cut).length).padStart(8), String(Math.max(...scores)).padStart(5), kind === "ai" ? `   ${lean.claude} / ${lean.chatgpt} / ${lean.unclear}   ${Object.entries(sus).map(([k, v]) => k + ": " + v).join(", ")}` : "");
 }
 const H = res.human, A = res.ai;
 console.log(`\n[${split}] cut-off ${cut}: humans wrongly flagged ${H.filter(s => s >= cut).length}/${H.length} (${(H.filter(s => s >= cut).length / H.length * 100).toFixed(1)}%), ` +

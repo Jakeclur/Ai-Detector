@@ -30,6 +30,9 @@ This file gives a Claude Code session the full context of how this project was b
 - `MODEL` = `{bias, w, cap}`: logistic model `z = bias + Σ w·min(f, cap)`. Current bias **-2.0**. v5 weights = 70% v4 hand-set + 30% a constrained logistic fit (humans weighted 3×, signs kept) on the Ghostbuster tune half plus this repo's corpus.
 - `analyze(text, {noShrink})` → `score` (0–100, shrunk towards 50 for short texts: confidence from 40→300 words), `band` (`human` <35, `inconclusive` 35–54, `ai` ≥55; any hard giveaway with score ≥45 → `ai`), `contrib`, `hits`, `counts`.
 - `attribute(text, r)` → `{claude, gpt, lean, confidence, ev}` from `CLAUDE_FP` / `GPT_FP` regex lists plus formatting rules (bold labels, headers, emoji → GPT; plain bullets without bold, spaced em dash, short even sentences → Claude). `lean` needs total ≥2 and margin ≥1.5. Confidence is "medium" only if margin ≥4 and total ≥5. It's only shown when score ≥45.
+- `suspect(text, r, attr)` → `{short, label, detail, version, confidence}`: the "Suspected AI" line shown on every result. "No AI suspected" below 35 (unless mixed), otherwise a model from `attribute`'s lean plus a version hint: Claude with em dashes ≥3/1,000 words or "genuinely" → older Claude, else Claude Opus 5.5; ChatGPT with "may provide"/"not necessarily" → GPT-5/6 era, with "delve"/"tapestry" → GPT-4 style, else "ChatGPT or a model like it".
+- **Opus 5.5 answer shape** (`shape` in `features`): 5 habits (label-style paragraphs, colon + plain list, one-sentence opening paragraph with 3+ more, "that's why", "the good news is"/"depends on"). `shape` = 0 for 0–1 habits, 0.3 for 2, N−1 for 3+; weight 1.5. Also +N to Claude in `attribute`. Measured on `tests/data/opus55/tune.txt` vs 2,281 human texts (3+ never in humans).
+- `paraSplit(text)`: blank-line paragraphs, or single lines when there are no blank lines (used by the shape clue; the evenness clue still uses blank-line paragraphs only, because switching it flagged one more human).
 - `segments(text)`: paragraph sections (or ~110-word sentence runs), each scored with `analyze`.
 - `slidingWindow(text)`: ~90-word half-overlapping windows scored with `noShrink`. Each sentence gets the average of the windows covering it. The UI shades sentences ≥65. The page sets band `mixed` if window max ≥70 and min ≤35 (or section hi ≥65 and lo ≤35) and the band isn't already `ai`.
 - `cautions(r)`: fairness notes.
@@ -57,6 +60,12 @@ This file gives a Claude Code session the full context of how this project was b
 - Built-in 20 samples: AI 8/11, humans 0/9, model 8 right, 0 wrong, 3 can't tell.
 - Mixed essay: overall 22 → "Mixed"; AI section 68; window max 71.
 - A trained common-word logistic model (400 words, L2) was prototyped: on Ghostbuster hold-out it raised AI caught at 0 human FPs from ~11% to ~27% (raw z), but did nothing for the newer-style corpus and isn't explainable per clue, so it was **not shipped**. Possible future option if the owner wants it.
+
+## v6 results (Opus 5.5 study)
+- `tests/data/opus55/`: 40 real Opus 5.5 answers (26 tune / 14 hold-out) + 15 "human-refined" (8/7), written by Opus 5.5 in this repo's Claude Code session after it had read the clue lists (contamination caveat in `prompts.md`).
+- v5 caught **0/40** (all human-leaning; means 18–19). v6: tune 6/26, hold-out 2/14, refined 0/15. Every flagged one → "Suspected AI: Claude Opus 5.5".
+- Opus 5.5 barely uses the research tells (em dashes, "This matters", "in short", "Looking ahead"). Its tells are structural. Stories, emails, essays and teen-style posts still look human.
+- Humans unchanged: Ghostbuster 10/2,056, own corpus 0/216, samples 0/9. Ghostbuster AI 25.0% unchanged.
 
 ## Decisions and rejected ideas
 - **v5 fairness fixes (from real learner essays):** "I hope this helps" is a stock phrase, not a certain giveaway (a Reddit writer used it); "I think" doesn't count as casual for the too-clean rule; the hopeful-ending clue needs dialogue or fiction clichés; lists of -ing words aren't trailing clauses; each AI word counts at most twice and tier-1 everyday words count half; "Copy code" only counts on its own line.

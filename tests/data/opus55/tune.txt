@@ -1,0 +1,389 @@
+Claude
+Sunlight looks white, but it's actually a mix of every colour. When it enters the atmosphere, it runs into gas molecules, mostly nitrogen and oxygen, that are far smaller than the wavelength of visible light. Molecules that small scatter short wavelengths much more strongly than long ones. Blue light has a short wavelength, so it gets bounced around the sky in every direction, while red and orange light mostly pass straight through.
+
+So when you look at any part of the sky away from the sun, you're seeing blue light that has been scattered towards your eyes. This effect is called Rayleigh scattering.
+
+You might wonder why the sky isn't violet, since violet has an even shorter wavelength. There are two reasons. The sun gives off less violet light than blue, and our eyes are much more sensitive to blue. The mix that reaches us reads as sky blue.
+
+The same idea explains sunsets. When the sun is low, its light travels through far more air to reach you. Most of the blue gets scattered away along the path, leaving the reds and oranges.
+---
+Claude
+A vaccine trains your immune system to recognise a germ before you ever meet the real thing.
+
+Your immune system learns by example. When a virus or bacterium gets into your body, it carries molecules on its surface called antigens. Immune cells spot these, build antibodies that stick to them, and keep a set of memory cells on file. The first time this happens it's slow, which is why you get sick. The second time, the memory cells react within days or even hours, often before you notice any symptoms.
+
+A vaccine gives your body that first lesson safely. Depending on the type, it contains:
+
+- a weakened or inactivated version of the germ
+- just one piece of it, such as a surface protein
+- instructions (mRNA) that get your own cells to make that protein for a short time
+
+None of these can cause the full disease, but they're enough for your immune system to build antibodies and memory cells.
+
+That's also why some vaccines need boosters. Memory can fade over time, and a booster reminds the immune system what to look for. When enough people in a community are immune, the germ struggles to spread, which protects people who can't be vaccinated.
+---
+Claude
+Compound interest means you earn interest on your interest, not just on the money you started with.
+
+Say you put $1,000 in a savings account that pays 5% a year. After one year you have $1,050. In the second year, the 5% is worked out on $1,050, not $1,000, so you earn $52.50 instead of $50. The gap looks tiny at first, but it keeps growing because every year's interest becomes part of the base for the next year.
+
+After 10 years, simple interest would give you $1,500. Compound interest gives you about $1,629. After 30 years it's $2,500 versus roughly $4,322.
+
+Three things control how fast it grows:
+
+1. The interest rate. A higher rate compounds much faster.
+2. Time. This is the big one. Most of the growth happens in the later years.
+3. How often interest is added. Monthly compounding beats yearly compounding slightly.
+
+The same maths works against you with debt. Credit card balances compound too, which is why a small unpaid balance can turn into a big one.
+
+A handy shortcut is the rule of 72: divide 72 by the interest rate to estimate how many years it takes to double your money. At 6%, that's about 12 years.
+---
+Claude
+Photosynthesis is how plants make their own food using light.
+
+The overall equation is:
+
+carbon dioxide + water → glucose + oxygen (using light energy)
+
+6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂
+
+It happens inside chloroplasts, mostly in the leaf cells. Chloroplasts contain chlorophyll, a green pigment that absorbs red and blue light and reflects green, which is why leaves look green.
+
+There are two main stages.
+
+Light-dependent reactions. These happen in the thylakoid membranes. Chlorophyll absorbs light energy, which is used to split water molecules. This releases oxygen as a by-product and produces two energy carriers, ATP and NADPH.
+
+Light-independent reactions (the Calvin cycle). These happen in the stroma, the fluid around the thylakoids. The plant uses the ATP and NADPH to turn carbon dioxide into glucose.
+
+Plants use the glucose for energy in respiration, store it as starch, or turn it into cellulose to build cell walls.
+
+The rate of photosynthesis depends on light intensity, carbon dioxide concentration and temperature. If any one of these is in short supply, it limits the rate, even if the other two are plentiful. These are called limiting factors, and they come up a lot in exam questions.
+---
+Claude
+The methods that work best are the ones that make your brain do some work, not the ones that feel productive.
+
+Test yourself instead of rereading. Rereading notes feels comfortable, but it mostly builds familiarity, not memory. Close the book and try to write down or say out loud what you know, then check. Past papers and flashcards are great for this.
+
+Space it out. Studying a topic for 30 minutes on four different days beats two hours the night before. Each time you come back after a gap, you have to work a bit to remember, and that effort is what makes it stick.
+
+Mix topics up. If you're doing maths, don't do twenty of the same question in a row. Mixing question types forces you to work out which method to use, which is exactly what the exam asks you to do.
+
+Explain it to someone. If you can teach a concept to a friend or a younger sibling, you understand it. If you get stuck halfway, you've found a gap.
+
+Sleep. Memory gets consolidated while you sleep, so an all-nighter usually costs more than it gains.
+
+A simple plan: list your topics, rate how confident you feel about each, and spend most of your time on the weak ones, testing yourself as you go.
+---
+Claude
+For most beginners I'd start with Python.
+
+Python's syntax is clean and close to plain English, so you spend your early weeks learning how to think like a programmer rather than fighting with brackets and semicolons. It's also used everywhere: data science, automation, school computing courses, AI, and backend web development. If you're taking Digital Technologies at school, there's a good chance you'll use it anyway.
+
+JavaScript makes more sense if your main goal is building websites. It's the only language that runs natively in web browsers, so you can make something interactive and show it to friends straight away, which is very motivating. The downside is that it has more quirks, and you usually need to learn some HTML and CSS alongside it.
+
+A quick way to decide:
+
+- Want to make websites or web apps? JavaScript.
+- Interested in data, AI, games with Pygame, or general problem-solving? Python.
+- Not sure yet? Python.
+
+The good news is that the choice matters less than it seems. Variables, loops, functions and debugging work almost the same way in both. Once you're comfortable in one, picking up the second takes weeks, not months.
+---
+Claude
+Congrats on landing the interview. A bit of preparation makes a big difference.
+
+Before the interview:
+- Look up the business. Know what they do, and if it's a shop or cafe, go in and have a look around.
+- Think of two or three examples from school, sport or volunteering that show you're reliable, work well in a team, and can handle pressure. Interviewers love specific stories.
+- Prepare answers to the common questions: "Tell me about yourself", "Why do you want to work here?", and "What are your strengths and weaknesses?"
+- Check your availability so you can answer clearly when they ask what hours you can work.
+
+On the day:
+- Arrive 10 minutes early. Plan how you're getting there the night before.
+- Dress a step above what the staff wear.
+- Make eye contact, smile, and give a firm handshake if they offer one.
+- It's fine to pause and think before answering.
+
+At the end, they'll usually ask if you have any questions. Have one or two ready, like "What does a typical shift look like?" or "What do you like about working here?" It shows you're genuinely interested.
+
+Afterwards, a short thank-you email is a nice touch, and most applicants don't bother.
+---
+Claude
+The causes of World War I are usually grouped into four long-term factors: militarism, alliances, imperialism and nationalism. In the decades before 1914, the major European powers built up huge armies and navies, and the naval race between Britain and Germany in particular created deep suspicion. At the same time, Europe split into two alliance blocs, the Triple Entente of Britain, France and Russia, and the Triple Alliance of Germany, Austria-Hungary and Italy, which meant a local conflict could quickly drag in every major power. Competition for colonies in Africa and Asia added to the rivalry, while nationalism fuelled tension in the Balkans, where Slavic groups wanted independence from Austria-Hungary. The immediate trigger came on 28 June 1914, when Gavrilo Princip, a Bosnian Serb nationalist, assassinated Archduke Franz Ferdinand in Sarajevo. Austria-Hungary, backed by Germany, issued an ultimatum to Serbia, and within weeks the alliance system had turned a regional crisis into a continental war. Historians still debate how much blame each country deserves, but most agree that the assassination only lit a fuse that had been laid over many years.
+---
+Claude
+In To Kill a Mockingbird, Harper Lee shows that real courage is not about physical strength or winning, but about doing what is right when you know you will probably lose.
+
+The clearest example is Atticus Finch's decision to defend Tom Robinson. Atticus knows the all-white jury in Maycomb will almost certainly convict Tom, and he knows the town will turn against his family. He takes the case anyway, telling Scout that if he refused, he "couldn't hold up my head in town." For Atticus, courage means acting on his conscience regardless of the outcome.
+
+Lee makes this idea explicit through Mrs Dubose. Jem thinks she is just a cruel old woman, but after her death Atticus reveals she was fighting a morphine addiction so she could die "beholden to nothing and nobody." He tells Jem that real courage is "when you know you're licked before you begin but you begin anyway and you see it through no matter what." This shifts Jem's view of bravery away from the image of a man with a gun.
+
+That contrast matters because Atticus earlier shoots a rabid dog with a single shot, and the children are thrilled. Yet Atticus himself does not treat this as courage. By placing these moments side by side, Lee suggests that the quiet, moral kind of bravery is harder and more important than the dramatic kind.
+---
+Claude
+Working on our Year 10 science project about water quality in the local creek taught me a lot, both about the topic and about working in a team.
+
+At the start, our group of four didn't plan very well. We split the tasks quickly, but we never agreed on a timeline, so two weeks in we realised that nobody had booked the testing kits. We lost several days catching up. After that, we set up a shared calendar and met for ten minutes every Monday at lunch to check where everyone was up to. It was a small change, but it made a big difference.
+
+My main role was collecting and analysing the data. I found I enjoyed turning the raw readings into graphs and spotting patterns, like the drop in dissolved oxygen after heavy rain. I also learned that I need to communicate more. A couple of times I changed the spreadsheet without telling anyone, and it caused confusion when others used the old numbers.
+
+The hardest part was a disagreement over our conclusion. One member wanted to claim the creek was polluted, but our data only showed it was below the recommended level on two of six days. We talked it through and settled on a more careful conclusion that matched the evidence.
+
+Next time, I would push for a clear plan in the first week and check in with teammates before changing shared work.
+---
+Claude
+The gold rushes of the 1850s transformed the Australian colonies in almost every way.
+
+The most obvious change was population. When gold was found near Bathurst in 1851 and then at Ballarat and Bendigo in Victoria, people poured in from Britain, Ireland, Europe, America and China. Australia's non-Indigenous population roughly tripled in a decade, from about 430,000 in 1851 to over 1.1 million by 1861. Melbourne grew from a small town into one of the richest cities in the British Empire.
+
+The economy changed too. Gold made the colonies wealthy and funded railways, telegraph lines, public buildings and universities. It also pushed up wages and drew workers away from farms and towns, at least for a while.
+
+The rushes also shaped politics. Miners resented the expensive licence fee and the harsh way it was enforced, and in 1854 tensions boiled over at the Eureka Stockade near Ballarat. The rebellion was crushed, but the reforms that followed gave miners the vote and helped push Victoria towards democratic rights such as the secret ballot.
+
+There was a darker side. Chinese miners faced violent attacks, such as the Lambing Flat riots, and restrictive laws that later fed into the White Australia policy. For Aboriginal people, the rush brought another wave of dispossession, as miners and settlers moved onto their land and destroyed water sources and food supplies.
+---
+Claude
+Biscuit had never been this far from the farm.
+
+He'd only meant to chase the rabbit to the edge of the paddock, but the rabbit had kept going, and so had he, under a fence and across a creek and through a stretch of scrub that all smelled the same. By the time he stopped, panting, the sun was low and nothing looked familiar.
+
+He spent the first night curled under a gum tree, flinching at every crack of a twig. In the morning he was hungry and his paws were sore, but he lifted his nose and tried to sort through the smells. Eucalyptus. Dust. Somewhere, faintly, cows.
+
+He followed the cows.
+
+It took most of the day. He drank from a trough, slipped past a farm dog that barked at him from behind a gate, and trotted along the edge of a road while cars hissed past. Twice he lost the trail and had to circle back. But the cow smell got stronger, and then, mixed in with it, came something else: woodsmoke, and the diesel of the old ute, and the lavender bush by the back steps.
+
+He started to run.
+
+Maya was sitting on the verandah with a stack of "LOST DOG" posters in her lap when she heard the gate rattle. She looked up, dropped the posters, and was halfway across the yard before Biscuit reached her. He knocked her flat into the grass and licked her face until she was laughing and crying at the same time.
+
+"Where have you been?" she said into his fur.
+
+Biscuit didn't answer. He was home, and that was enough.
+---
+Claude
+The school was twice the size of Leo's old one, and every corridor looked the same.
+
+He stood outside the office clutching a timetable that might as well have been in code. Room B14. He'd already walked past B12 and B16 twice. Kids streamed around him in groups, laughing about things that had happened before he arrived.
+
+"You look lost," said a girl with a backpack covered in badges.
+
+"I'm looking for B14."
+
+"That's my maths class. It's up the stairs, they numbered them weird." She started walking, and after a second he realised he was supposed to follow. "I'm Priya."
+
+"Leo."
+
+Maths was fine. The teacher made him stand up and say one fact about himself, and he panicked and said he had a lizard, which was true but made a boy at the back snort. At recess he sat on a bench and pretended to read his timetable again so it didn't look like he had nowhere to be.
+
+Then Priya walked past with two friends, stopped, and came back.
+
+"What kind of lizard?"
+
+"A bearded dragon. His name's Kevin."
+
+The boy who'd snorted turned out to be one of her friends. His name was Sam, and he also had a bearded dragon, called Steve. They argued for the rest of recess about which name was worse.
+
+By the end of the day, Leo still didn't know where half his classes were. But he knew where to sit at lunch, and that felt like the more important map.
+---
+Claude
+The new house had one rule, according to the estate agent: don't worry about the knocking in the walls. Old pipes, she said.
+
+Ellie didn't worry about it the first week. The knocking came at night, three slow taps, then silence. Pipes.
+
+In the second week, she noticed it only started after she turned off her bedroom light. She tested it. Light on, nothing. Light off, three taps.
+
+She told her dad, who laughed and said she'd been watching too many videos. He went up into the roof with a torch and came down with cobwebs in his hair and nothing else.
+
+That night, Ellie lay in the dark and counted. One. Two. Three. Then, for the first time, a fourth.
+
+She didn't move. The tapping started again, but it was different now. Closer. It moved along the wall beside her bed, slowly, the way you'd run your knuckles along a fence. It stopped right behind her pillow.
+
+Then, very softly, from inside the wall, something knocked back the same rhythm she'd been tapping on her desk all afternoon while she did her homework.
+
+In the morning, she asked the estate agent who had lived there before.
+
+The agent's smile didn't move. "A family with a girl about your age," she said. "They left in a hurry. She was always tapping on things."
+---
+Claude
+Hi Coach,
+
+Just letting you know I won't be able to make training on Tuesday or Thursday this week. I've got a school camp from Monday to Friday, and we don't get back until late Friday afternoon.
+
+I'll do some running and ball work on my own over the weekend so I don't fall behind. Is there anything specific you'd like me to work on before Saturday's game? If it's easier, I'm happy to come early on Saturday to go over any new plays.
+
+Sorry for the short notice, and thanks for understanding.
+
+Cheers,
+Jake
+---
+Claude
+Dear Grandma,
+
+Thank you so much for the birthday present. The jumper is perfect. It fits really well, and the dark green is my favourite colour, which I'm guessing you already knew. I wore it to school on Monday and two people asked where I got it.
+
+Thank you as well for the card. I laughed at the joke about turning sixteen and still not being able to reach the top shelf.
+
+I'm sorry I didn't get to see you on the day. Mum says we might come down in the school holidays, and I'm really hoping we can. I'd love it if you could show me how to make your lemon slice, since I've tried twice and it never turns out like yours.
+
+Thanks again for thinking of me. I love you heaps.
+
+Lots of love,
+Sam
+---
+Claude
+I've been using these wireless headphones every day for about three weeks, mostly on the bus and at the gym, and overall I'm impressed, with a couple of catches.
+
+Sound quality is the highlight. The bass is punchy without drowning out vocals, and the treble stays clear even at high volume. Out of the box they're a little bass-heavy, but the app has an equaliser that fixes it in about a minute.
+
+Noise cancelling is good rather than great. It handles the hum of a bus or plane really well, but sharper sounds like people talking still come through. For the price, that's about what I expected.
+
+Battery life is excellent. The box claims 40 hours with noise cancelling on, and I'm getting close to that. Ten minutes of charging gives a few hours of listening, which has saved me more than once.
+
+Comfort is where they fall short. The ear cups are soft, but the clamping force is strong, and after about two hours my ears start to ache. If you have glasses, this might be worse.
+
+The microphone is fine for calls indoors, but people said I sounded muffled when I was walking outside on a windy day.
+
+Verdict: if you want great sound and battery life for the money and you mostly listen in short sessions, these are an easy recommendation. If you plan to wear headphones for hours at a time, try them on first.
+---
+Claude
+Australia has moved quickly on renewable energy over the past decade, but it still has a long way to go.
+
+Renewables now supply around 40% of the electricity on the main national grid, up from about 15% in 2015. Rooftop solar is a big part of that story. Roughly one in three Australian homes has panels, one of the highest rates in the world. Large wind and solar farms have also expanded, especially in South Australia, which regularly runs on close to 100% renewable power for hours at a time.
+
+The federal target is 82% renewable electricity by 2030. Getting there depends on three things:
+
+Transmission. New wind and solar farms are often far from cities, and the poles and wires to connect them are expensive and slow to build. Several major projects are running years behind schedule and over budget.
+
+Storage. Solar produces nothing at night, so the grid needs big batteries and pumped hydro, such as the delayed Snowy 2.0 project, to fill the gaps.
+
+Replacing coal. Several coal power stations are scheduled to close this decade. If replacements aren't ready in time, there's a risk of supply shortfalls and price spikes.
+
+Outside electricity, progress is slower. Transport, heavy industry and agriculture still rely heavily on fossil fuels, and these sectors will be harder to change than the power grid.
+---
+Claude
+Last Saturday I finally did the hike I've been putting off for two years: the summit track at the national park, about 12 kilometres return with 600 metres of climbing.
+
+We started at 7am to beat the heat. The first hour is gentle, winding through tall forest with the creek running beside the path. It was cool and green, and we saw a lyrebird scratching around in the leaf litter, which was a first for me.
+
+Then the track turns uphill and doesn't let up. The last two kilometres are mostly rock steps, some of them knee-high. I'm not going to pretend I enjoyed this part. My legs were burning, and I stopped "to take photos" more often than strictly necessary.
+
+The top made up for it. You come out of the trees onto a bare granite ridge, and the view stretches all the way to the coast. We sat in the sun eating squashed sandwiches for nearly an hour.
+
+A few tips if you're planning it:
+
+- Bring at least two litres of water each. There's none on the track.
+- Wear shoes with good grip. The granite is slippery when wet.
+- Start early in summer. The upper section has no shade.
+- Allow five to six hours, including breaks.
+
+Going down was faster but harder on the knees. I'm still a bit sore three days later, and I'd do it again tomorrow.
+---
+Claude
+That error means you're trying to get an item at a position that doesn't exist in the list.
+
+Python lists start counting from 0, so a list with 3 items has positions 0, 1 and 2:
+
+fruits = ["apple", "banana", "cherry"]
+print(fruits[3])   # IndexError: list index out of range
+
+The most common causes are:
+
+1. Off-by-one loops. Using range(len(fruits) + 1) or range(1, len(fruits) + 1) goes one step too far. Use range(len(fruits)), or better, loop over the items directly:
+
+for fruit in fruits:
+    print(fruit)
+
+2. An empty list. If the list is empty, even fruits[0] fails. Check first with if fruits: before accessing items.
+
+3. Changing a list while looping over it. Removing items inside a loop shifts the positions, so later indexes no longer exist.
+
+4. Assuming input has a certain length. For example, splitting a line of text and expecting three parts when there are only two.
+
+To find the problem, print the length of the list and the index just before the line that crashes:
+
+print(len(fruits), i)
+
+That usually shows exactly where the numbers stop lining up. If you paste the part of your code with the loop, I can point to the exact line.
+---
+Claude
+My ideal weekend starts on Friday afternoon, the moment the last bell goes. I'd walk home with my friends, stop at the bakery for a sausage roll, and spend the evening doing absolutely nothing useful, probably watching movies with my family and arguing about which one to pick.
+
+On Saturday I'd sleep in until at least nine, which in my house counts as a miracle. After a big breakfast of pancakes, I'd head down to the beach with a couple of friends. We'd swim, try to bodysurf, mostly fail, and lie on our towels until we got too hot and had to go back in. In the afternoon I'd play my netball game, and in my ideal version we'd win by one goal in the last minute.
+
+Saturday night would be a sleepover at my best friend's house. We'd order pizza, stay up far too late, and talk about everything and nothing.
+
+Sunday would be slower. I'd go for a walk with my dog along the river, read a few chapters of whatever book I'm into, and help Dad cook a roast for dinner. I would definitely not do any homework, because in my ideal weekend it would all be finished already.
+
+By Sunday night I'd feel rested and ready for the week, which, now that I think about it, almost never happens in real life.
+---
+Claude
+ok so i finally watched that new space movie everyone keeps talking about and honestly?? it was kind of mid. like the first half was actually really good, the visuals were insane and there's this scene where they're floating outside the ship and the music just drops out and it's dead silent and i got chills.
+
+but then the second half just. dragged. so much talking about feelings and the main guy's backstory with his dad which i get is supposed to be emotional but i was checking my phone ngl. and the ending made no sense?? my friend tried to explain it to me after and i still don't get it.
+
+the acting was good tho. the girl who plays the pilot was the best part by far, she was funny and she actually felt like a real person. also the robot was lowkey the funniest character.
+
+would i watch it again? probably not. would i tell people to see it? maybe, if they like slow movies or they're really into space stuff. otherwise just watch the trailer lol it has all the best bits
+
+6/10
+---
+Claude
+Spent the weekend down the coast and I'm already missing it. Three days of salt hair, sandy everything, and fish and chips on the sea wall while the sun went down. The water was freezing but we went in every morning anyway, purely out of stubbornness. Saw a pod of dolphins on the last day, which felt like the beach saying goodbye. Back to reality now, and my bag still has half the beach in it. Same time next year?
+---
+Claude
+Dear Hiring Manager,
+
+I'm writing to apply for the casual barista and front-of-house position at Bean & Leaf, which I saw advertised in your window last week.
+
+I'm a Year 11 student at Riverside High, and I'm available after school on Tuesdays and Thursdays, all day Saturday, and for extra shifts during the school holidays. I've been a regular at Bean & Leaf for a couple of years, and I've always liked how friendly and welcoming the staff are, even on busy Saturday mornings.
+
+While I haven't worked in a café before, I have experience dealing with people and working under pressure. For the past year I've volunteered at the canteen at my local footy club, where I take orders, handle cash and keep the counter clean during the rush at half-time. I've also completed a barista short course at TAFE, so I understand the basics of making espresso, steaming milk and keeping equipment clean.
+
+I'm reliable, I learn quickly, and I'm happy to take on whatever needs doing, whether that's washing dishes or clearing tables. My teachers and my canteen supervisor are happy to provide references.
+
+Thank you for considering my application. I'd love the chance to come in for a trial shift.
+
+Kind regards,
+Ella Nguyen
+---
+Claude
+Both make great pets. Which one is better depends mostly on your lifestyle.
+
+Dogs are a good fit if:
+- you're home a lot, or someone in the household is
+- you enjoy walks and being active
+- you want a pet that's very social and eager to please
+- you have a yard, or easy access to parks
+
+Dogs need daily exercise, training and company. Many breeds struggle if they're left alone for long hours, and they cost more to look after, especially once you add vet bills, food and boarding when you go away.
+
+Cats are a good fit if:
+- your household is out at school or work during the day
+- you live in a flat or a smaller space
+- you want a pet that's affectionate but more independent
+
+Cats groom themselves, use a litter tray, and are generally happy to entertain themselves. They're not low-maintenance, though. They still need play, vet care and attention, and some are much clingier than their reputation suggests. In Australia, it's also best to keep them indoors or in an enclosure to protect wildlife.
+
+If you're choosing for a family, think about who'll actually be doing the walking, feeding and cleaning up. That person's schedule usually answers the question.
+
+If you can, spend time with a friend's dog or cat, or volunteer at a shelter first. Personality varies so much between individual animals that meeting a few is more useful than any list.
+---
+Claude
+A few changes make a much bigger difference than willpower alone.
+
+Check your numbers first. Open the screen time settings on your phone and look at which apps take up the most time. Most people are surprised by one or two of them. That tells you where to focus.
+
+Make the habit harder to start:
+- Move the worst apps off your home screen, or into a folder on the last page.
+- Log out of them, so you have to type your password each time.
+- Turn off all notifications except messages from actual people.
+
+Set limits that do the deciding for you. Use the app timer feature to cap your top apps at, say, 30 minutes a day. When the timer hits, you have to make a conscious choice to keep going.
+
+Change your environment. Charge your phone outside your bedroom overnight and use a cheap alarm clock instead. Keep it in your bag, not your pocket, while you're doing homework.
+
+Replace, don't just remove. If you scroll when you're bored, have something else ready: a book on your bedside table, a guitar in the corner, a walk with a friend. It's much easier to swap a habit than to stop one.
+
+Start small. Cutting an hour a day straight away usually doesn't last. Try 20 minutes less this week, then a bit more next week.

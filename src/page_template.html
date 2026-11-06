@@ -52,6 +52,8 @@
   .marker { position: absolute; top: -5px; width: 4px; height: 22px; background: var(--ink); border-radius: 2px; transform: translateX(-2px); transition: left .4s; }
   .scale { display: grid; grid-template-columns: 35fr 20fr 45fr; color: var(--muted); font-size: .78rem; }
   .scale span:nth-child(2) { text-align: center; } .scale span:nth-child(3) { text-align: right; }
+  .suspect { margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: var(--soft); font-size: .95rem; }
+  .suspect .note { display: block; margin-top: 2px; }
   .pill { display: inline-block; font-size: .78rem; padding: 2px 9px; border-radius: 99px; background: var(--soft); color: var(--muted); margin-top: 6px; }
   h2 { font-size: 1.05rem; margin: 0 0 4px; }
   .h2note { color: var(--muted); font-size: .85rem; margin: 0 0 14px; }
@@ -127,6 +129,7 @@
     <div class="row" style="margin-top:8px">
       <span class="note">Try a sample:</span>
       <button data-sample="claude">Claude-style answer</button>
+      <button data-sample="opus">Real Claude Opus 5.5 answer</button>
       <button data-sample="chatgpt">ChatGPT-style answer</button>
       <button data-sample="classic">Old ChatGPT essay</button>
       <button data-sample="mixed">Human essay with a pasted AI paragraph</button>
@@ -145,6 +148,7 @@
             <div class="verdict" id="verdict"></div>
             <div class="note" id="verdictNote"></div>
             <span class="pill" id="confPill"></span>
+            <div class="suspect" id="suspect"></div>
           </div>
           <button id="copy">Copy summary</button>
         </div>
@@ -266,6 +270,7 @@ a Claude answer goes here…</pre>
       <tr><td>Claude (2023): stories and news</td><td class="n">2%</td></tr>
     </table></div>
     <p>Compared with the previous version, this one wrongly flags about half as many people (10 instead of 19) and catches a few more chatbot texts (450 instead of 418), and it did better on both counts on the half that was kept back.</p>
+    <p><b>Real Claude Opus 5.5 answers.</b> 40 answers written by Claude Opus 5.5 itself (explanations, advice, essays, stories, emails and "write like a teen" posts) were used to find its habits. Before this, the detector caught 0 of 40 and called every one human-leaning. Now it flags 6 of the 26 used for tuning and 2 of the 14 kept back, mostly structured answers and explanations. Stories, emails and essays from Opus 5.5 still mostly look human to it. When it does flag one, it names Claude Opus 5.5 as the suspected AI. Versions edited by a "student" (casual words, typos, personal details) were caught 0 of 15 times.</p>
     <p><b>Own test set</b> (newer chatbot styles, all written by Claude): 0 of 216 human passages flagged; AI caught: classic ChatGPT-style essays 100%, modern answers about 33%, stories about 25%, emails about 13%, AI told to sound like a teenager about 10%. Any text with leftover chatbot lines ("As an AI language model", "[Your Name]", citation codes) is nearly always caught.</p>
     <p><b>Big caveat:</b> the real chatbot text is from 2023 models, which write differently from today's. The newer-style samples were all written by one AI (Claude), and the "ChatGPT-style" ones are imitations. Use the Test lab with your own real examples to find out how it does for you.</p>
     <p><b>Which-model guess:</b> on 11 sample passages it named the intended model 8 times and said "can't tell" 3 times. On real 2023 Claude essays it sometimes said "ChatGPT-leaning" and never "Claude-leaning", because its Claude clues come from 2026 Claude versions. Treat it as a hint.</p>
@@ -279,12 +284,14 @@ a Claude answer goes here…</pre>
       <li><b>Certain giveaways.</b> Lines a chatbot leaves behind when an answer is pasted unedited: "As an AI language model", "I hope this helps", "If you want, I can also…", "Would you like me to…", "[Your Name]", ChatGPT citation codes (<code>oaicite</code>, <code>utm_source=chatgpt.com</code>).</li>
       <li><b>Measured words only.</b> Words that studies counted as over-used against human writing: <i>delve</i>, <i>showcasing</i>, <i>underscores</i> (15 million science abstracts), and <i>dependable</i> (23× the human rate), <i>steady</i> and <i>thoughtful</i> for Claude Opus 5.5 (Graphite, 2026). Many words from blog lists were dropped: Originality.ai checked 10 million words of ChatGPT output and found favourites like "delve" were actually rare.</li>
       <li><b>Structure.</b> Sentence length and spread, bullet/heading/bold density, paragraph evenness, "In short"-style closers, "not X, it's Y" contrasts, rule-of-three lists, trailing ", highlighting…" clauses (2–5× more common in AI), hedging, vague attributions ("experts suggest"), generic praise words, colons, and a lack of concrete names and numbers. The absence-type clues count only a little.</li>
+      <li><b>Opus 5.5 answer shape.</b> Found by studying real Claude Opus 5.5 answers: paragraphs that start with a short label and a full stop ("Storage. Solar produces nothing at night…"), a colon line followed by a plain list, a one-sentence opening answer, "that's why", and "the good news is" / "depends mostly on". One of these alone is normal in human writing, so it counts only when three or more appear together, which never happened in 2,281 human texts.</li>
       <li><b>Fiction and email habits.</b> "For a long moment", "said quietly", "felt something shift", tidy hopeful endings, and email boilerplate such as "I hope this email finds you well" plus "Please don't hesitate to reach out".</li>
       <li><b>Too-clean casual text.</b> Text that sounds casual ("honestly", "kind of") but has no slips at all, even sentences and a neat moral at the end. Real people writing carefully can look like this, so it adds only a moderate amount and never decides the result alone.</li>
       <li><b>Version-aware clues.</b> Habits change between model versions. Pangram found Claude Opus 5.5 says "genuinely" 83% less than Opus 5, says "in short" 11× more, uses about 85% more bullets, and writes shorter, more even sentences. Em dashes almost vanished in Opus 5.5 but are still common in some GPT-5 output. So em dashes and "genuinely" now count for very little.</li>
       <li><b>Human signs.</b> Missing apostrophes ("dont"), lowercase "i", slang, "!!", and very uneven sentence lengths lower the score.</li>
       <li><b>Text cleaning.</b> Invisible characters are removed, look-alike letters (for example a Cyrillic "о" hidden in an English word to fool detectors) are swapped back, and curly quotes are straightened before checking. You're told when this happens.</li>
     </ul>
+    <p><b>Suspected AI.</b> Every result ends with a suspected AI: "No AI suspected", a model (Claude Opus 5.5, older Claude, ChatGPT GPT-5/6, older GPT-4-style ChatGPT, or "ChatGPT or a model like it"), or "can't tell". The version hint comes from habits that changed between releases, such as em dashes (common in older Claude, almost gone in Opus 5.5) and words like "delve" (GPT-4 era).</p>
     <p><b>Claude vs ChatGPT.</b> The "Idiosyncrasies in LLMs" study (ICML 2025) could tell ChatGPT, Claude, Grok, Gemini and DeepSeek apart 97% of the time with a trained model. It found ChatGPT bolds key points, titles answers with headers and favours "certainly", "such as" and "overall", while Claude uses plain lists, less bold, and phrases like "based on" and "here". Newer clues come from 2026 studies of Opus 5.5 and GPT-5.x/6. The study also found models trained on ChatGPT output write like ChatGPT, so an unknown model will often look ChatGPT-leaning.</p>
     <p><b>Fairness.</b> A 2023 Stanford study found commercial detectors wrongly flagged 61% of essays by non-native English writers. This tool doesn't score vocabulary richness or word length, and it warns you when a text is formal, very plain or list-heavy. It only works on English.</p>
     <p>Sources: <a href="https://www.pangram.com/blog/can-pangram-detect-opus-5-5">Pangram: Opus 5.5</a> · <a href="https://www.remio.ai/post/claude-opus-5-5-writing-tells-changed-but-they-did-not-disappear">Graphite study (via remio)</a> · <a href="https://arxiv.org/abs/2502.12150">Idiosyncrasies in LLMs</a> · <a href="https://originality.ai/blog/can-humans-detect-chatgpt">Originality.ai: common ChatGPT words</a> · <a href="https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing">Wikipedia: Signs of AI writing</a> · <a href="https://arxiv.org/abs/2406.07016">Kobak et al.</a> · <a href="https://arxiv.org/abs/2410.16107">Reinhart et al.</a> · <a href="https://arxiv.org/abs/2304.02819">Liang et al.</a></p>
@@ -310,6 +317,7 @@ if (typeof document !== "undefined") {
   const SAMPLES = {
     claude: labBlocks[1].split("\n").slice(1).join("\n"),
     chatgpt: labBlocks[6].split("\n").slice(1).join("\n"),
+    opus: "Compound interest means you earn interest on your interest, not just on the money you started with.\n\nSay you put $1,000 in a savings account that pays 5% a year. After one year you have $1,050. In the second year, the 5% is worked out on $1,050, not $1,000, so you earn $52.50 instead of $50. The gap looks tiny at first, but it keeps growing because every year's interest becomes part of the base for the next year.\n\nAfter 10 years, simple interest would give you $1,500. Compound interest gives you about $1,629. After 30 years it's $2,500 versus roughly $4,322.\n\nThree things control how fast it grows:\n\n1. The interest rate. A higher rate compounds much faster.\n2. Time. This is the big one. Most of the growth happens in the later years.\n3. How often interest is added. Monthly compounding beats yearly compounding slightly.\n\nThe same maths works against you with debt. Credit card balances compound too, which is why a small unpaid balance can turn into a big one.\n\nA handy shortcut is the rule of 72: divide 72 by the interest rate to estimate how many years it takes to double your money. At 6%, that's about 12 years.",
     classic: "Social media has become an integral part of modern life, fundamentally reshaping the way people communicate and connect. Moreover, it plays a crucial role in fostering a sense of community among diverse groups, enabling individuals to share experiences across borders. However, it is important to note that excessive use can have significant effects on mental health, particularly among young people. Furthermore, the rapid spread of misinformation presents a multifaceted challenge for society, underscoring the need for robust digital literacy. Additionally, privacy concerns continue to shape the ongoing debate about regulation. Ultimately, navigating the complexities of the digital landscape requires a balanced approach. In conclusion, while social media offers numerous benefits, it is essential to harness its potential responsibly and thoughtfully.",
     mixed: [H_JEROME, H_THOREAU, A_IND, "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this."].join("\n\n"),
     human: H_JEROME
@@ -372,6 +380,7 @@ if (typeof document !== "undefined") {
     if (r.win && r.win.max >= 70 && r.win.min <= 35 && r.band !== "ai") r.band = "mixed";
     if (r.segs.length >= 2) { const hi = Math.max(...r.segs.map(s => s.score)), lo = Math.min(...r.segs.map(s => s.score)); if (hi >= 65 && lo <= 35 && r.band !== "ai") r.band = "mixed"; }
     r.english = englishCoverage(text);
+    r.suspect = suspect(text, r, r.attr);
     return r;
   }
   const BAND_TEXT = {
@@ -408,6 +417,7 @@ if (typeof document !== "undefined") {
       { v: k.dash, t: "Em dashes (weak, version-dependent)", d: `${plural(c.dashes, "em dash", "em dashes")}. Some models use many, others (like Claude Opus 5.5) almost none.` },
       { v: k.lowSpec, t: "Few concrete specifics", d: `Few names, numbers or quotes (${c.specifics.toFixed(1)} per 100 words). Generic writing is a mild AI sign.` },
       { v: k.even, t: "Overly even tone", d: `Sentence lengths${c.paras >= 3 ? " and paragraph lengths" : ""} are very uniform, with no exclamations or questions.` },
+      { v: k.shape, t: "Opus 5.5 answer shape", d: `${c.shapeN} of 5 habits found in real Claude Opus 5.5 answers: ${[c.shapeLabel && "label-style paragraphs (\"Storage. Solar produces…\")", c.shapeList && "a colon line then a plain list", c.shapeOpener && "a one-sentence opening answer", c.shapeWhy && "\"that's why\"", c.shapeFrame && "\"the good news is\" / \"depends on\""].filter(Boolean).join(", ")}. One alone is normal in human writing; three or more never appeared in 2,281 human texts.` },
       { v: k.tooClean, t: "Casual but too clean", d: "Sounds casual, yet has no slips at all, even rhythm and a neat moral or generic ending." },
       { v: k.wrap, t: "Neat moral ending", d: "The last sentence wraps things up in a stock way." },
       { v: rhythm, t: "Sentence rhythm", d: `${c.sentences} sentences, ${c.minLen}–${c.maxLen} words (average ${c.avgLen.toFixed(0)}, spread ${c.cv.toFixed(2)}). ${rhythm < -0.15 ? "Lengths vary a lot, which is more typical of people." : "Fairly even lengths."}` },
@@ -428,6 +438,7 @@ if (typeof document !== "undefined") {
       : a.lean === "claude" ? "Based mostly on habits of recent Claude versions (Opus 5.5, Sonnet 5). Older and future versions write differently."
       : total < 2 ? "Too few model-specific clues. The text could come from any model, or from a person." : "Clues point both ways. It could be either, another model, or edited text.";
     $("attr").innerHTML = `<div class="verdict" style="color:${head[1]}">${head[0]}${a.confidence !== "none" ? ` <span class="pill">${a.confidence} confidence</span>` : ""}</div>
+      ${r.suspect && r.suspect.version !== "unknown" && r.suspect.version !== "none" ? `<div class="note">Best version guess: ${escH(r.suspect.label)}</div>` : ""}
       <div class="tug"><div class="marker" style="left:${pos}%"></div></div><div class="tug-lbl"><span>Claude</span><span>ChatGPT</span></div>
       <p class="note" style="margin:8px 0 0">${escH(note)} This guess has only been checked on a handful of sample passages, so treat it as a hint.</p>
       <div class="attr">
@@ -483,6 +494,8 @@ if (typeof document !== "undefined") {
     $("verdictNote").textContent = r.counts.hard ? "Contains text a chatbot typically leaves behind when its answer is pasted in. See the red box above." : B[2];
     $("confPill").textContent = r.wc < 120 ? "Low confidence: short text" : r.wc < 250 ? "Medium confidence" : "Higher confidence: long enough text";
     $("marker").style.left = r.score + "%";
+    const sp = r.suspect;
+    $("suspect").innerHTML = `Suspected AI: <b>${escH(sp.label)}</b>${sp.confidence !== "none" ? ` <span class="pill" style="margin-top:0">${sp.confidence} confidence</span>` : ""}<span class="note">${escH(sp.detail)} This is a hint, not proof.</span>`;
 
     const hard = r.hits.filter(h => h.type === "hard");
     $("giveaways").classList.toggle("hide", !hard.length);
@@ -518,7 +531,7 @@ if (typeof document !== "undefined") {
 
     lastSummary = [
       `AI Text Detector result: ${r.score}/100, ${B[0]} (${r.wc} words, ${$("confPill").textContent.toLowerCase()}).`,
-      r.score >= 45 || r.counts.hard ? `Model guess: ${r.attr.lean === "claude" ? "Claude-leaning" : r.attr.lean === "chatgpt" ? "ChatGPT-leaning (or a similar model)" : "can't tell"}${r.attr.confidence !== "none" ? ` (${r.attr.confidence} confidence)` : ""}.` : "",
+      `Suspected AI: ${r.suspect.label}${r.suspect.confidence !== "none" ? ` (${r.suspect.confidence} confidence)` : ""}.`,
       ...rows.filter(s => s.v > 0.1).slice(0, 6).map(s => `+ ${s.t}: ${s.d}`),
       ...rows.filter(s => s.v < -0.1).slice(0, 3).map(s => `- ${s.t}: ${s.d}`),
       segs.length >= 2 ? `Sections: ${segs.map(s => s.score).join(", ")}` : "",
@@ -588,7 +601,7 @@ if (typeof document !== "undefined") {
       // the model guess is only shown (and only judged) when the text looks AI-like enough
       const lean = r.score >= 45 || r.counts.hard ? r.attr.lean : "unclear";
       const mdl = (label === "Claude" || label === "ChatGPT") ? (lean === "unclear" ? "?" : (lean === label.toLowerCase())) : null;
-      rows.push({ i: i + 1, label, wc: r.wc, score: r.score, band: r.band, lean, conf: r.attr.confidence, det, mdl, preview: text.replace(/\s+/g, " ").slice(0, 70) });
+      rows.push({ i: i + 1, label, wc: r.wc, score: r.score, band: r.band, lean, conf: r.attr.confidence, sus: r.suspect.short, det, mdl, preview: text.replace(/\s+/g, " ").slice(0, 70) });
     });
     const ok = rows.filter(r => !r.short);
     const by = l => ok.filter(r => r.label === l);
@@ -604,8 +617,8 @@ if (typeof document !== "undefined") {
       ${rows.some(r => r.short) ? `<p class="note">${rows.filter(r => r.short).length} text(s) were under 40 words and skipped.</p>` : ""}
       <p class="note" style="margin-bottom:0">Tip: drag the cut-off to see the trade-off. Lower catches more AI but flags more humans. Paste these results back to Claude to help tune the weights.</p>`;
     const mark = v => v === null ? "" : v === "?" ? `<span class="note">can't tell</span>` : v ? `<span class="ok">✓</span>` : `<span class="bad">✗</span>`;
-    const leanTxt = r => r.lean === "claude" ? "Claude" : r.lean === "chatgpt" ? "ChatGPT" : "can't tell";
-    $("ltable").innerHTML = `<tr><th>#</th><th>Label</th><th class="n">Words</th><th class="n">Score</th><th>Result</th><th>Detected?</th><th>Looks like</th><th>Model?</th><th>Start of text</th></tr>` +
+    const leanTxt = r => r.score >= 45 && r.sus && r.sus !== "none" ? r.sus : r.lean === "claude" ? "Claude" : r.lean === "chatgpt" ? "ChatGPT" : "can't tell";
+    $("ltable").innerHTML = `<tr><th>#</th><th>Label</th><th class="n">Words</th><th class="n">Score</th><th>Result</th><th>Detected?</th><th>Suspected AI</th><th>Model?</th><th>Start of text</th></tr>` +
       rows.map(r => r.short ? `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td colspan="5" class="note">too short</td><td class="note">${escH(r.preview)}</td></tr>` :
         `<tr><td>${r.i}</td><td>${r.label}</td><td class="n">${r.wc}</td><td class="n" style="color:var(--${toneOf(r.score)});font-weight:700">${r.score}</td><td>${BAND_TEXT[r.band][0].split(":")[0]}</td><td>${mark(r.det)}</td><td>${r.score >= 45 ? leanTxt(r) + (r.conf !== "none" ? ` <span class="note">(${r.conf})</span>` : "") : `<span class="note">–</span>`}</td><td>${mark(r.mdl)}</td><td class="note">${escH(r.preview)}…</td></tr>`).join("");
     labCsv = ["#\tlabel\twords\tscore\tresult\tdetected\tlooks_like\tmodel_correct\tstart"].concat(rows.map(r => r.short ? `${r.i}\t${r.label}\t${r.wc}\t\ttoo short\t\t\t\t${r.preview}` : `${r.i}\t${r.label}\t${r.wc}\t${r.score}\t${r.band}\t${r.det === null ? "" : r.det ? "yes" : "no"}\t${leanTxt(r)}\t${r.mdl === null ? "" : r.mdl === "?" ? "unclear" : r.mdl ? "yes" : "no"}\t${r.preview}`)).join("\n") + `\ncut-off\t${cut}`;

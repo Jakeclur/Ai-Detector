@@ -1,6 +1,6 @@
 // ==CORE==
 /* =====================================================================
-   AI Text Detector engine (v5). Rules only: no trained text model, no network.
+   AI Text Detector engine (v6). Rules only: no trained text model, no network.
    Evidence sources (see the page's "research" section):
    - Kobak et al. 2024/25 (excess vocabulary in 15M abstracts)
    - Reinhart et al., PNAS 2025 (participial clauses etc.)
@@ -79,7 +79,9 @@ const AI_PHRASES = [
   ["moral imperative|timeless (?:exploration|tale|story|classic)", 3, "importance puffery"],
   ["may provide|not necessarily|does not (?:establish|guarantee)", 1.5, "hedge phrase (GPT-6 era)"],
   ["perhaps the most|one of the (?:most|best) [\\w'-]+ (?:about|in|of)", 1.5, "superlative framing"],
-  ["i hope this (?:helps|was helpful|gives you)|hope that helps\\b", 2.5, "chatbot-style sign-off (people say it too)"]
+  ["i hope this (?:helps|was helpful|gives you)|hope that helps\\b", 2.5, "chatbot-style sign-off (people say it too)"],
+  ["if you (?:paste|share|send|post|give me|tell me)\\b[^.?!\\n]{0,80}\\bi(?:'ll| can| could)\\b", 2.5, "assistant offer (\"if you paste…, I can…\")"],
+  ["the good news is|the (?:downside|upside|trade-off|tradeoff) is (?:that )?", 1.5, "assistant framing (\"the good news is\")"]
 ];
 // Fiction habits (Pangram: "for a long moment", "said quietly", "felt something", "paused", "stared" rose in Opus 5.5)
 const FICTION = [
@@ -154,6 +156,7 @@ const GPT_FP = [
 ];
 
 const WORD = /[A-Za-z0-9][A-Za-z0-9'-]*/g;
+function paraSplit(t) { return (/\n[ \t]*\n/.test(t) ? t.split(/\n\s*\n/) : t.split("\n")).filter(p => p.trim()); }
 function clamp(x, a = 0, b = 1) { return Math.max(a, Math.min(b, x)); }
 function nWords(s) { return (s.match(WORD) || []).length; }
 function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
@@ -247,7 +250,7 @@ function features(text) {
   // tidy hopeful ending (last sentence)
   const lastS = (sents[sents.length - 1] || "").toLowerCase();
   const narrative = fiction > 0 || (text.match(/"[^"\n]{3,}"/g) || []).length >= 2;
-  const hopeEnd = narrative && /\b(?:for the first time|began to (?:smile|laugh|hope|heal|believe)|smiled|finally (?:felt|knew|understood)|maybe(?:,)? (?:that|this) was enough|was (?:a|the) (?:start|beginning)|(?:felt|feel) like home|hope\b|together\b|light\b|took (?:a|one) (?:step|breath)|began to read|whatever came next)\b/.test(lastS) ? 1 : 0;
+  const hopeEnd = narrative && /\b(?:for the first time|began to (?:smile|laugh|hope|heal|believe)|smiled|finally (?:felt|knew|understood)|(?:maybe(?:,)? |and )?(?:that|this) was enough|was (?:a|the) (?:start|beginning)|(?:felt|feel) like home|hope\b|together\b|light\b|took (?:a|one) (?:step|breath)|began to read|whatever came next)\b/.test(lastS) ? 1 : 0;
 
   // email boilerplate
   let eopen = 0, eclose = 0;
@@ -282,7 +285,8 @@ function features(text) {
     cv = Math.sqrt(lens.reduce((a, b) => a + (b - avgLen) ** 2, 0) / lens.length) / avgLen;
     extreme = lens.filter(n => n >= 45 || n <= 3).length / lens.length;
   } else if (lens.length) avgLen = lens.reduce((a, b) => a + b, 0) / lens.length;
-  const paras = text.split(/\n\s*\n/).map(p => nWords(p)).filter(n => n >= 8);
+  const paraTexts = paraSplit(text);
+  const paras = text.split(/\n\s*\n/).map(p => nWords(p)).filter(n => n >= 8);   // evenness uses blank-line paragraphs only (as in v5)
   let paraCv = 1;
   if (paras.length >= 3) { const pm = paras.reduce((a, b) => a + b, 0) / paras.length; paraCv = Math.sqrt(paras.reduce((a, b) => a + (b - pm) ** 2, 0) / paras.length) / pm; }
 
@@ -315,6 +319,27 @@ function features(text) {
   const even = (lens.length >= 6 && cv < 0.38 ? 0.5 : 0) + (paras.length >= 3 && paraCv < 0.22 ? 0.3 : 0) + (excl === 0 && slipsN === 0 && wc >= 120 ? 0.2 : 0);
   // casual-sounding but suspiciously clean and generic (the "write like a teen" case)
   const casualStrong = (lower.match(/\b(?:honestly|like,|kind of|sort of|pretty much|i guess|i reckon|you know|basically|literally|to be honest|whatever)\b/g) || []).length;
+  // Opus 5.5 "answer shape": habits measured on real Opus 5.5 answers vs 2,281 human texts.
+  // Each one alone is common enough in human writing; 2+ together were rare, and 3+ never seen in humans.
+  //  - label-style paragraphs: "Storage. Solar produces nothing at night…" (a short verbless label, a full stop, then the point)
+  //  - a colon line introducing a plain list
+  //  - a one-sentence opening paragraph that answers straight away, followed by 3+ more paragraphs
+  //  - "that's why" / "which is why"
+  //  - "the good news is", "the downside is", "a quick way to decide:", "depends mostly on"
+  const LABEL_RE = /^[ \t]*(?:[-*•][ \t]*|\d+[.)][ \t]*)?([A-Z][a-z'’-]+(?:[ \t]+[a-z][\w'’()-]*){0,4})\.[ \t]+(?=[A-Z][^\n]{25,})/gm;
+  const NOT_LABEL = /\b(?:is|are|was|were|be|been|am|has|have|had|do|does|did|can|could|will|would|should|may|might|must|i|you|he|she|it|we|they|me|him|her|them|us|my|his|their|our|your|this|that|there|here|not|no|yes|yeah|oh|ok|okay|well|so|then|now|just|said|says|thanks|thank|please|sorry|hello|hi|hey|mr|mrs|ms|dr|st|fell|froze|stood|sat|woke|ran|came|took|saw|felt|knew|thought|left|began|turned|looked|smiled|nodded|shook)\b|\w(?:ed|ly)\b/i;
+  const labels = [];
+  scan(LABEL_RE, m => { if (!NOT_LABEL.test(m[1])) labels.push([m.index + m[0].indexOf(m[1]), m[1].length]); });
+  const shapeLabel = labels.length >= 2 ? 1 : 0;
+  if (shapeLabel) for (const [a, n] of labels) add(a, a + n + 1, "struct", "label-style paragraph opener (Opus 5.5 habit)");
+  const shapeList = /[a-z)][ \t]*:[ \t]*\n(?:[ \t]*\n)?[ \t]*(?:[-*•]|\d+[.)])[ \t]+\S[^\n]*\n[ \t]*(?:[-*•]|\d+[.)])[ \t]+\S/.test(text) ? 1 : 0;
+  const p0 = (paraTexts[0] || "").trim();
+  const shapeOpener = paraTexts.length >= 4 && !/^(?:hi|hey|dear|hello|good (?:morning|afternoon|evening)|subject|to whom)\b/i.test(p0) && !/,$/.test(p0)
+    && (p0.match(/[.!?](?=\s|$)/g) || []).length === 1 && /\.$/.test(p0) && nWords(p0) >= 6 && nWords(p0) <= 28 ? 1 : 0;
+  const shapeWhy = /\b(?:that's|which is|this is) (?:also |exactly )?why\b/i.test(text) ? 1 : 0;
+  const shapeFrame = /\b(?:the good news is|the (?:downside|upside|trade-off|tradeoff|catch) is|a (?:simple|quick|handy|good|easy) (?:way|rule|shortcut|plan|test)\b[^.\n]{0,30}:|depends (?:mostly |largely |mainly )?on\b)/i.test(text) ? 1 : 0;
+  const shapeN = shapeLabel + shapeList + shapeOpener + shapeWhy + shapeFrame;
+  const shape = shapeN >= 3 ? shapeN - 1 : shapeN === 2 ? 0.3 : 0;   // 2 habits: a nudge; 3+: strong
   const tooClean = (casualStrong + slang >= 2 || (contr >= 4 && casualStrong + slang >= 1)) && slipsN === 0 && lens.length >= 6 && cv < 0.55 && (wrap || hopeEnd) ? 1 : 0;
 
   return {
@@ -322,13 +347,14 @@ function features(text) {
     f: {
       hard, vocab: per100(vocab), phrase: per100(phrase), negpar: negpar / ns, frame: frame / ns, part: part / ns, tri: tri / ns, trans: trans / ns,
       summ, fiction: per100(fiction), hopeEnd, email, hedge: per100(hedge), vague: per100(vague), praise: per100(praise),
-      colon: per100(colons), dash: per100(dashes), fmt: per100(fmt), cv, extreme, slips: per100(slips), wrap, lowSpec, even, tooClean
+      colon: per100(colons), dash: per100(dashes), fmt: per100(fmt), cv, extreme, slips: per100(slips), wrap, lowSpec, even, tooClean, shape
     },
     counts: {
       hard, vocab: vocabN, phrase: phraseN, negpar, frame, part, tri, trans, summ, fiction, hopeEnd, email, eopen, eclose, hedge, vague, praise, colons, dashes,
       bullets, headings, bolds, boldLabels, emoji, listShare, sentences: lens.length, avgLen, cv, paraCv, paras: paras.length, minLen: lens.length ? Math.min(...lens) : 0,
       maxLen: lens.length ? Math.max(...lens) : 0, slips: slipsN, casual, contr, specifics, digits, names, quotes, wrap, excl,
-      spacedDash: (text.match(/\s—\s/g) || []).length, tightDash: (text.match(/\w—\w/g) || []).length
+      spacedDash: (text.match(/\s—\s/g) || []).length, tightDash: (text.match(/\w—\w/g) || []).length,
+      shapeN, shapeLabel, shapeList, shapeOpener, shapeWhy, shapeFrame, labels: labels.length
     }
   };
 }
@@ -343,8 +369,8 @@ function features(text) {
 const MODEL = { bias: -2.0, w: {
   hard: 2.5, vocab: 0.59, phrase: 0.62, negpar: 2.49, frame: 3.0, part: 2.36, tri: 0.62, trans: 2.78,
   summ: 0.65, fiction: 0.97, hopeEnd: 0.34, email: 0.56, hedge: 0.08, vague: 1.21, praise: 0.27,
-  colon: 0.14, dash: 0.29, fmt: 0.28, cv: -1.0, extreme: -2.21, slips: -0.87, wrap: 0.86, lowSpec: 0.27, even: 0.68, tooClean: 1.01
-}, cap: { hard: 3, vocab: 6, phrase: 6, negpar: 0.5, frame: 0.5, part: 0.6, tri: 0.6, trans: 0.5, fiction: 3, email: 4, hedge: 6, vague: 2, praise: 6, colon: 3, dash: 3, fmt: 6, slips: 6 } };
+  colon: 0.14, dash: 0.29, fmt: 0.28, cv: -1.0, extreme: -2.21, slips: -0.87, wrap: 0.86, lowSpec: 0.27, even: 0.68, tooClean: 1.01, shape: 1.5
+}, cap: { shape: 3, hard: 3, vocab: 6, phrase: 6, negpar: 0.5, frame: 0.5, part: 0.6, tri: 0.6, trans: 0.5, fiction: 3, email: 4, hedge: 6, vague: 2, praise: 6, colon: 3, dash: 3, fmt: 6, slips: 6 } };
 
 function scoreFeatures(f) {
   let z = MODEL.bias; const contrib = {};
@@ -386,6 +412,12 @@ function attribute(text, r) {
   // dash style: Sonnet-style spaced " — " vs OpenAI-style "word—word" (weak; newer models vary)
   if (c.spacedDash >= 2 && c.spacedDash > c.tightDash) { cl += 1; ev.claude.push("spaced em dashes ( — )"); }
   if (c.tightDash >= 1 && c.tightDash > c.spacedDash) { gp += c.tightDash >= 2 ? 1 : 0.5; ev.gpt.push("unspaced em dashes (word—word)"); }
+  // Opus 5.5 answer shape (measured on real Opus 5.5 answers in tests/data/opus55)
+  if (c.shapeN >= 2) {
+    const parts = [c.shapeLabel && "label-style paragraphs", c.shapeList && "colon then plain list", c.shapeOpener && "one-sentence opening answer", c.shapeWhy && "\"that's why\"", c.shapeFrame && "\"the good news is\" / \"depends on\""].filter(Boolean);
+    cl += c.shapeN; ev.claude.push(`Opus 5.5 answer shape: ${parts.join(", ")}`);
+  }
+  if (/\bif you (?:paste|share|send|post|give me|tell me)\b[^.?!\n]{0,80}\bi(?:'ll| can| could)\b/i.test(text)) { cl += 1.5; ev.claude.push("offers to look at your work (\"if you paste…, I can…\")"); }
   // shape: Opus 5.5 writes short, even sentences (~10-13 words)
   if (c.sentences >= 6 && c.avgLen >= 8 && c.avgLen <= 13.5 && c.cv < 0.5) { cl += 1; ev.claude.push(`short, even sentences (avg ${c.avgLen.toFixed(0)} words)`); }
   if (c.sentences >= 6 && c.avgLen >= 19) { gp += 0.5; ev.gpt.push(`long sentences (avg ${c.avgLen.toFixed(0)} words)`); }
@@ -394,6 +426,31 @@ function attribute(text, r) {
   if (total >= 2 && Math.abs(margin) >= 1.5) lean = margin > 0 ? "claude" : "chatgpt";
   const confidence = lean === "unclear" ? "none" : (Math.abs(margin) >= 4 && total >= 5 ? "medium" : "low");
   return { claude: cl, gpt: gp, lean, confidence, ev };
+}
+
+// ---------- 6b. Suspected AI (shown at the end of every result) ----------
+// Turns the score and the Claude-vs-ChatGPT clues into one plain answer, including a version hint.
+function suspect(text, r, a) {
+  const c = r.counts, lower = text.toLowerCase();
+  const dashRate = r.wc ? c.dashes / r.wc * 1000 : 0;
+  const looksAI = r.score >= 55 || c.hard > 0;
+  const maybeAI = r.score >= 35 || r.band === "mixed";
+  const lean = a.lean;
+  let name = null, version = "", why = "";
+  if (lean === "claude") {
+    const old = /\bgenuinely\b|\bthe honest answer\b|\bmatters enormously\b/.test(lower) || dashRate >= 3;
+    name = old ? "Claude (older version, like Opus 5 or Sonnet)" : "Claude Opus 5.5 (or another recent Claude)";
+    version = old ? "claude-old" : "claude-opus-5.5";
+    why = old ? "Claude-style habits, plus em dashes or \"genuinely\", which older Claude versions used far more than Opus 5.5." : "Claude-style habits with almost no em dashes, which fits Opus 5.5.";
+  } else if (lean === "chatgpt") {
+    if (/\bmay provide\b|\bnot necessarily\b|\bdoes not establish\b/.test(lower)) { name = "ChatGPT (GPT-5 / GPT-6 era)"; version = "gpt-new"; why = "ChatGPT-style habits plus hedges like \"may provide\" and \"not necessarily\" that newer GPT models overuse."; }
+    else if (/\bdelv(?:e|es|ing)\b|\btapestry\b|\bin today's (?:fast-paced|digital)\b|\btestament to\b/.test(lower)) { name = "ChatGPT (older, GPT-4-style)"; version = "gpt-old"; why = "ChatGPT-style habits plus words like \"delve\" and \"tapestry\" from the GPT-4 era."; }
+    else { name = "ChatGPT, or a model that writes like it (Gemini, Grok, DeepSeek…)"; version = "gpt"; why = "ChatGPT-style habits. Many other models write the same way."; }
+  }
+  const SHORT = { "claude-old": "older Claude", "claude-opus-5.5": "Claude Opus 5.5", "gpt-new": "ChatGPT (GPT-5/6)", "gpt-old": "ChatGPT (GPT-4 style)", gpt: "ChatGPT-like" };
+  if (!looksAI && !maybeAI) return { short: "none", label: "No AI suspected", detail: name ? `Few AI habits overall. If AI was used, the closest match is ${name}.` : "Few AI habits, and no model-specific clues.", version: "none", confidence: "none" };
+  if (!name) return { short: looksAI ? "AI, unclear which" : "can't tell", label: looksAI ? "An AI model, but it's not clear which" : "Can't tell", detail: looksAI ? "Many AI habits, but no clear Claude or ChatGPT clues. It could be another model, or edited text." : r.band === "mixed" ? "Part of the text shows many AI habits, but there aren't enough model-specific clues to say which AI." : "Not enough evidence of AI, and no model stands out.", version: "unknown", confidence: "none" };
+  return { short: SHORT[version], label: name, detail: why + (looksAI ? "" : " The overall score is inconclusive, so this is only a possibility."), version, confidence: looksAI ? a.confidence : "low" };
 }
 
 // ---------- 7. Long texts: sections and sliding window ----------
@@ -496,4 +553,4 @@ function compareStyles(known, unknown) {
   return { delta, level, diffs, nA: A.n, nB: B.n };
 }
 // ==/CORE==
-if (typeof module !== "undefined") module.exports = { compareStyles, englishCoverage, cleanText, features, analyze, scoreFeatures, MODEL, BANDS, attribute, segments, slidingWindow, cautions, nWords };
+if (typeof module !== "undefined") module.exports = { suspect, compareStyles, englishCoverage, cleanText, features, analyze, scoreFeatures, MODEL, BANDS, attribute, segments, slidingWindow, cautions, nWords };
