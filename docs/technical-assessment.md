@@ -149,3 +149,16 @@ These need more and better modern data, especially real outputs from current mod
 
 **Lesson:** check what the loader actually reads. A file-name pattern that was too loose distorted one test group for three versions without anyone noticing.
 
+## 8. v12.2: short-text rule for the recent-Claude specialist
+
+All 10 people still wrongly flagged in section 7 were flagged by the recent-Claude specialist, not by the main model. Eight were short school answers (46–158 words) where the main model gave only 5–41%. Now, on texts under 150 words, the specialist counts only when the main model gives at least 50%.
+
+**Results:**
+- Humans flagged: 10 → 3 (school essays 8 → 1).
+- AI caught: unchanged, the same 5,753 texts.
+- Opus 5.5, humaniser and Test lab results are unchanged.
+
+A plain 150-word floor gave the same false-flag count but missed most short Claude texts, so it was rejected.
+
+**Caveat:** the rule was found by looking at the school-essay false flags, so that figure is optimistic for it.
+

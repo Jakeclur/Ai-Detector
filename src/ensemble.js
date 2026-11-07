@@ -71,7 +71,7 @@ function modelScore(text, R, sf) {
   // out-of-distribution: how many features sit well outside anything seen in training
   let outside = 0; for (let j = 0; j < v.length; j++) { const span = M.range.hi[j] - M.range.lo[j] || 1; if (v[j] > M.range.hi[j] + 0.25 * span || v[j] < M.range.lo[j] - 0.25 * span) outside++; }
   // specialists (e.g. recent Claude): each has its own strict cut-off
-  const spec = (M.specialists || []).map(S => ({ name: S.name, label: S.label, p: scoreWith(S, R, sf, wc), cut: S.cutoffs.ai, minGeneral: S.minGeneral || 0 }));
+  const spec = (M.specialists || []).map(S => ({ name: S.name, label: S.label, p: scoreWith(S, R, sf, wc), cut: S.cutoffs.ai, minGeneral: S.minGeneral || 0, minWords: S.minWords || 0, shortMinGeneral: S.shortMinGeneral ?? 0 }));
   return { p: cal(z), pLow: cal(z - 1.5 * zsd), pHigh: cal(z + 1.5 * zsd), z, zsd, fam, top: top.slice(0, 12), outside, cut: M.cutoffs, spec };
 }
 
@@ -114,7 +114,8 @@ function assess(raw, opts = {}) {
     const g = r.cutGenre && m.cut.genre[r.cutGenre] != null ? r.cutGenre : "other";
     const cutAI = m.cut.genre[g] ?? m.cut.ai;
     // a specialist only counts when the general model gives at least some support (stops extreme disagreements)
-    const hit = m.spec.filter(s => s.p >= s.cut && m.p >= s.minGeneral);
+    // v12.2: on short texts it needs the general model to lean AI too (the recent-Claude one fired on short school answers)
+    const hit = m.spec.filter(s => s.p >= s.cut && m.p >= (r.wc < s.minWords ? Math.max(s.minGeneral, s.shortMinGeneral) : s.minGeneral));
     r.specialist = hit.length ? hit[0] : null;
     const pShow = r.specialist ? Math.max(m.p, r.specialist.p) : m.p;
     r.likelihood = Math.round(pShow * 100);

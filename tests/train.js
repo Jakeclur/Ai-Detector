@@ -268,7 +268,7 @@ if (require.main === module) {
   const S = toJSON(trainAll(spec, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.998, genrePct: 0.998, members: 5 }));
   json.specialists = [{ name: "claude-modern", label: "recent Claude (Opus 5.5-like)", features: S.features, ruleKeys: S.ruleKeys, styleKeys: S.styleKeys, vocab: S.vocab,
     mu: S.mu, sd: S.sd, members: S.members, calibration: S.calibration, cutoffs: { ai: S.cutoffs.ai }, length: S.length, trainedOn: spec.filter(r => r.y).length + " Opus 5.5 texts",
-    minGeneral: 0.05 }];   // only counts when the general model gives at least 5%: stops extreme disagreements (a Reddit dialogue story scored 0 vs 0.92)
+    minGeneral: 0.05, minWords: 150, shortMinGeneral: 0.5 }];   // v12.2: under 150 words the general model must give >= 50% (it flagged 7 short real school answers, ASAP)   // only counts when the general model gives at least 5%: stops extreme disagreements (a Reddit dialogue story scored 0 vs 0.92)
   // 3) humaniser specialist: AI text run through a humaniser tool vs all human texts (strict cut-off)
   const hum = rows.filter(r => !r.y || r.doc.condition === "humaniser");
   const HS = toJSON(trainAll(hum, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.999, genrePct: 0.999, members: 5 }));

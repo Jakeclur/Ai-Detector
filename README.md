@@ -199,7 +199,7 @@ Each family has its own fingerprint clues. The detector adds them up and shows a
 
 ## How accurate is it?
 
-### v12 (current): character patterns, stricter cut-off
+### v12: character patterns, stricter cut-off
 v12 adds 512 hashed character-pattern features (three-character sequences such as "ing", "tio" and ", t"), which capture spelling, morphology and punctuation habits. In a matched test with zero held-out humans flagged, they raised AI caught from 81.9% to 85.6% (humaniser text 46% → 67%).
 
 The released model uses a stricter cut-off (the 99.9th percentile of human scores). At the 99.8th percentile, v12 flagged one more reformatted human essay than v11, and that's not allowed.
@@ -217,7 +217,22 @@ The released model uses a stricter cut-off (the 99.9th percentile of human score
 
 So v12 trades about 1 point of overall recall for fewer people flagged or left in the grey zone, and for better resistance to rewording. The owner's essay scores 49, "Likely human-written", just under the 50 line.
 
-### v12 re-tested (Nov 2026): data fix and 12,428 more student essays
+### v12.2 (current): stricter recent-Claude specialist on short texts
+All 10 people still wrongly flagged in the re-test below were flagged by the **recent-Claude specialist**, not by the main model. For 8 of them, short school answers of 46–158 words, the main model gave only 5–41%. Now, on texts **under 150 words**, the specialist only counts if the main model gives at least 50%. Nothing was retrained.
+
+| Held-out, corrected data | v12.1 | v12.2 |
+|---|---|---|
+| Real human texts wrongly flagged (15,419) | 10 | **3 (0.02%)** |
+| … ASAP grade 7–10 school essays (12,428) | 8 | **1** |
+| … Reddit stories (490) | 2 | 2 |
+| … same texts with short lines removed / on one line | 10 / 9 | **3 / 2** |
+| AI caught, overall (7,082) | 81.2% | 81.2% (the same 5,753 texts) |
+| Claude Opus 5.5 / edited Opus / humaniser | 36% / 40% / 91% | 36% / 40% / 91% |
+| Built-in Test lab samples | 6 of 11 AI, 0 of 9 humans | 6 of 11 AI, 0 of 9 humans |
+
+**Honest caveat:** this rule was found by looking at the ASAP false flags, so the ASAP figure for it is optimistic. The other test groups were not used to choose it, and none of them got worse. A plain 150-word floor was also tried. It gave the same 3 false flags but missed most short Claude-written test texts (38% → 5%), so the softer rule was kept.
+
+### v12.1 re-test (Nov 2026): data fix and 12,428 more student essays
 Two things changed in the test data, not the model:
 
 1. **A data-loading bug was fixed.** Since v9, the loader had also read the Ghostbuster dataset's token-probability tables (files in `logprobs/` folders) as if they were texts. That put about 200 tables of numbers into the "humaniser AI" group and about 100 into the GPTZero "human" group. The humaniser results reported for v9–v12 (11–28%) were mostly measuring those tables. On the real humaniser texts, v12 catches **91%** (32 of 35 held-out texts; ranking AUC 1.000). The test set is small, and it all comes from one tool (undetectable.ai, 2023).
@@ -564,6 +579,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
 | v8 | Tested with a real student's English essay (thanks to the owner). It scored 28, "Human-leaning", but the old Mixed rule labelled it "Mixed", and the same rule hit 76 of 2,056 real human texts. **New Mixed rule:** one non-final paragraph 70+ and 40+ above the rest; shading now marks that whole paragraph. Humans labelled Mixed 76 → 6 of 2,262. Scores and AI-leaning results unchanged |
 | v9 | Bigger real-data test (5,303 human / 4,635 AI texts, incl. humaniser-tool output). In-text citations as a human sign; lone AI words count 40%; weights re-fitted; Mixed threshold 72. Humans flagged 33 → 15, AI caught 30% → 33%, with no human group getting worse |
+| v12.2 | Recent-Claude specialist needs ≥50% from the main model on texts under 150 words. Held-out humans flagged 10 → 3 (ASAP school essays 8 → 1), AI caught unchanged |
 | v12.1 | No model change. Fixed a test-data bug (token-probability tables loaded as texts; real humaniser recall is 91%, not 28%); added 12,428 ASAP school essays as a test-only fairness check (8 flagged, 0.06%); new import scripts. v13 candidates (neutral essay conventions, ASAP training, bigger retrain) rejected |
 | v12 | Hashed character 3-gram features; trained genre classifier for the "type of writing" shown; stricter cut-offs (99.9th percentile); a reformatted-human-text robustness test in the benchmark. Held-out humans flagged 2 (reformatted versions 3 → 2), humans in "inconclusive" 3.5% → 2.8%, recall 83.3% → 82.3%, sentence-level rewording 53% → 57% |
 | v11 | Gradient-boosted trees blended with the logistic ensemble; trained Claude-vs-ChatGPT attribution (right 88–99% of the time when it names a model, vs 2–28% for the old clues); humaniser specialist; specialists need ≥5% support from the main model; "likely human" below 50; version hints from the recent-Claude model; 40 more Opus 5.5 samples. Held-out: humans flagged 3 → 2, recall 82.0% → 83.3%, Opus 5.5 29% → 36% (on a larger test set), edited Opus 0% → 40% |
