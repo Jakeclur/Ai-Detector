@@ -24,7 +24,7 @@ const GROUPS = [
 ];
 function files(dir) {
   const out = [];
-  const walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith(".txt")) out.push(p); } };
+  const walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) { if (f.name !== "logprobs") walk(p); } else if (/^[0-9]+\.txt$/.test(f.name)) out.push(p); } };
   if (fs.existsSync(dir)) walk(dir);
   return out.sort();
 }

@@ -26,7 +26,9 @@ const GB = process.env.GHOSTBUSTER_DIR || path.join(DATA, "ghostbuster");
 
 function walk(d) {
   if (!fs.existsSync(d)) return [];
-  return fs.readdirSync(d, { withFileTypes: true }).flatMap(f => f.isDirectory() ? walk(path.join(d, f.name)) : f.name.endsWith(".txt") ? [path.join(d, f.name)] : []);
+  // only real texts: numbered .txt files. Ghostbuster also ships per-token probability tables ("12-ada.txt",
+  // "logprobs/" folders); before v13 these were wrongly loaded as texts in the humaniser and GPTZero sets.
+  return fs.readdirSync(d, { withFileTypes: true }).flatMap(f => f.isDirectory() ? (f.name === "logprobs" ? [] : walk(path.join(d, f.name))) : /^[0-9]+\.txt$/.test(f.name) ? [path.join(d, f.name)] : []);
 }
 const read = f => fs.readFileSync(f, "utf8");
 const num = f => parseInt(path.basename(f), 10);
