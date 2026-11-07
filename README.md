@@ -235,6 +235,8 @@ Two ways of using the new texts were tested:
 | Opus 5.5 edited to sound like a student (15) | 40% | 33% |
 | ROC-AUC | 0.996 | 0.996 |
 
+**Later the same day (v12.4 attempt, rejected):** 23 more Opus 5.5 texts were written and used to retrain the specialist again. Humans flagged rose 2 → 4 (a university essay and a school essay) and held-out Opus fell 53% → 51%, so v12.3 was kept. Those 23 texts became extra test data instead: v12.3 catches 10 of them (43%). Across all 74 held-out Opus 5.5 texts, v12.3 catches **50%**. Overall: 2 of 15,419 humans flagged, 81.1% of 7,117 AI texts caught.
+
 The 39 earlier texts are the fairer measure, because the new held-out batch was written alongside the new training texts. One edited Opus text is no longer caught. The usual caveat applies: all the Opus 5.5 texts were written in this project's own session, by a model that knew they were for a detector. Rebuild with `V12DATA=1 SPECIALIST_ONLY=1 node tests/train.js` (about 1 minute).
 
 ### v12.2: stricter recent-Claude specialist on short texts

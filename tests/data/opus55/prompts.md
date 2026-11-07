@@ -79,3 +79,10 @@ batch4_holdout.txt: 1–2 short stories (a blackout card game, an underdog chess
 Before any retraining, the v12.2 model caught 13 of these 36 (tune 9/24, hold-out 4/12), in line with its 36% on the earlier held-out Opus texts.
 
 Names, places, organisations and figures in these passages are invented for the writing tasks (the news reports are fictional).
+
+## Fifth batch: batch5_test.txt (23), test-only
+
+Same session, same caveat. Written as training data for a second specialist retrain, which flagged more real humans (2 → 4) and was rejected, so these are kept as held-out test data only. v12.3 caught 10 of the 23. Contents: 1–2 stories (a lighthouse keeper's daughter, brothers and a bedroom window); 3 sports club notice; 4 casual review of a TV season; 5 changing a flat tyre; 6 reflection on a closed café; 7 essay on AI for homework; 8 letter to a councillor about a footpath; 9 why cats purr; 10 book review; 11 email to a teacher about lab report feedback; 12 tips for starting high school; 13 geography excursion report; 14 viruses vs bacteria; 15 note to a parent about a car dent; 16 how to stop procrastinating; 17 news report (Maleny vote on chain stores); 18 musical review; 19 thank-you message to a co-worker; 20 the water cycle; 21 persuasive speech on swimming lessons; 22 a reflection about a dog; 23 renting vs buying.
+
+Names, places, organisations and figures are invented for the writing tasks (the news report is fictional).
+
