@@ -21,6 +21,8 @@ This file gives a Claude Code session the full context of how this project was b
 - `node tests/lab.js [file] [cutoff]` runs Test lab-format files (`---`-separated, label on the first line: Human/Claude/ChatGPT/AI).
 - `bash tests/data/fetch_ghostbuster.sh` then `node tests/eval_ghostbuster.js tune|holdout|all` scores **real** human text (student essays, Reddit stories, Reuters, English-learner essays) and **real** ChatGPT/Claude 2023 output (Ghostbuster dataset, CC BY 3.0, gitignored). Tune on `tune`, check `holdout` once.
 - `python3 tests/data/make_dataset.py && node tests/eval_corpus.js` scores the larger corpus. The machine-collected human part (`human.json`, `dataset.json`) is gitignored because it's other projects' text under their licences; `build_human.py` has Linux paths from the original environment and may need adjusting.
+- **v14 sealed benchmark:** `node tests/benchmark.js` scores the **dev** half (frozen v12.3 in `tests/baselines/v12.3` vs `src/`, each in its own process, cached in `tests/.cache/`) and writes `docs/benchmark-dev.*`. Use dev for every decision. `CONFIRM_FINAL=yes node tests/benchmark.js --final` scores the sealed **final** half, writes `docs/benchmark.*` and appends to `docs/final-runs.md`: run it once per release, never to tune. Log every experiment in `docs/experiment-log.md`.
+- **Independent test data (gitignored, test-only):** `bash tests/data/fetch_external.sh` (DetectRL + OUTFOX; `--train` adds DetectRL training files, used only with `DRL_TRAIN=1`), `python3 -I tests/data/outfox_to_jsonl.py`. ASAP: `bash tests/data/fetch_asap.sh`.
 - No npm or pip packages are required.
 - For a visual check, open `index.html` in a browser and click each sample button, the Compare example and "Load 20 sample passages" in the Test lab. There should be no console errors.
 
@@ -29,9 +31,10 @@ This file gives a Claude Code session the full context of how this project was b
 - **Model (v12):** 50/50 blend of logistic regression and gradient-boosted trees (`tests/lib/gbdt.js`: 250 depth-3 trees, monotone constraints from the same fairness signs) over [27 rule clues | 33 style features | ~300 common-token frequencies | 512 hashed character 3-grams], standardised; 7 bootstrap logistic members (spread → `pLow/pHigh`, confidence); Platt calibration with balanced classes on group-5-fold out-of-fold scores; length shrink of the logit (min 0.3 at 40 words, full at 300); cut-offs: AI ≥ 99.9th percentile of OOF human scores (99.95th per genre, never below the global), "likely human" ≤ max(0.5, 95th percentile). Sign constraints: rule clues keep direction, apostrophe/slang tokens ≤ 0. Human weight 2, Opus weight 8.
 - **Specialists** (in `model.json.specialists`): `claude-modern` (Opus 5.5 vs humans, cut at the 99.8th percentile) and `humaniser` (undetectable.ai text vs humans, 99.9th). A specialist only fires if the general p ≥ `minGeneral` (0.05), and for `claude-modern` on texts under 150 words (`minWords`) only if the general p ≥ 0.5 (`shortMinGeneral`, v12.2). Fires → band `ai`. Disabled for out-of-distribution text unless the general p ≥ 0.995.
 - **Attribution model** (`model.json.attribution`, v11): Claude (1) vs ChatGPT (0), logistic + GBDT blend trained on AI texts only. Applied in `assess` when the band isn't `human` (and only to the stand-out paragraph for Mixed); p ≥ 0.65 → claude, ≤ 0.35 → chatgpt. Rule-based `attribute()` evidence is kept. `suspect()` version hint: Claude + recent-Claude specialist p ≥ 0.5 → "Claude Opus 5.5", otherwise older/unclear.
+- **Mixed writing (v14):** `paraFeatures(text, docZ)` in `ensemble.js` describes every paragraph of 30+ words (needs 3+): 24 features (general-model logit on the paragraph raw and length-shrunk, gaps to the other paragraphs' median/max, style-vector distance from the rest and its within-document outlier ratio, function-word delta vs the rest, rule-score gap, position, paragraph count, log length, quoted share, citations, document logit, family contributions, and `paraModel` logit with its median/max gaps). `mixedScore` applies `model.json.mixedModel` (packed boosted trees + Platt); `assess()` sets band `mixed` when the best paragraph p ≥ `mixedModel.cut` (0.995) and the band isn't `ai` and the text isn't OOD; `r.mix.paras` holds every paragraph's p for the page. The page's `mixedCheck` (v8 rule) is only a fallback when no mixed model is loaded. `paraModel` = paragraph-level classifier (`tests/train_para.js`, trained on cross-fit fold A paragraphs); `mixedModel` = `tests/train_mixed.js --fold=B --variants=3` (fold B hosts, each as is + 3 versions with 1-2 real AI paragraphs inserted, `tests/lib/mixed.js`). Fold = md5(group + "|crossfit") % 2.
 - **Long texts** (> 1,500 words): `chunkedScore` scores ~600-word chunks and combines them (a single long document drifted out of distribution and once triggered the specialist on joined human essays).
 - **OOD:** ≥ 3 standardised features outside the training range by 25%, poem/list layouts (`layoutOdd`), or non-English → logit × 0.25 and never "likely AI" unless p ≥ 0.995 or a hard giveaway.
-- **Rebuild model:** see v12.3 below (the shipped model = v12.2 general model + specialist-only retrain). `node tests/train.js` (about 13 min) → `python3 build.py` → `node tests/benchmark.js` (about 1 min; writes `docs/benchmark.html/json`). `tests/lib/datasets.js` loads all data with group splits and `markLeaks` (near-duplicate check). Import new samples via `tests/data/samples/*.jsonl`.
+- **Rebuild model:** see v14 below (shipped = v12.3 model + paraModel + mixedModel) and v12.3 (v12.2 general model + specialist-only retrain). `node tests/train.js` (about 13 min) → `python3 build.py` → `node tests/benchmark.js` (about 1 min; writes `docs/benchmark.html/json`). `tests/lib/datasets.js` loads all data with group splits and `markLeaks` (near-duplicate check). Import new samples via `tests/data/samples/*.jsonl`.
 - **`suspect()` and the page are band-based** since v10 (not score ≥ 55). The Test lab slider's far-left value means "auto" (the detector's own cut-offs).
 
 ## Architecture (src/core.js, the rule engine)
@@ -132,6 +135,46 @@ This file gives a Claude Code session the full context of how this project was b
 - Benchmark: humans flagged 10 → 3 (ASAP 8 → 1 = set5 158 words; 2 Reddit stories with general p 0.93 / 0.59); reformatted 3 + 2; recall 81.23% (same 5,753 TPs); Opus 36%, edited 40%, humaniser 91%; Test lab 6/11 AI, 0/9 humans; owner essay 49 human.
 - Chosen while looking at the ASAP FPs, so the ASAP figure is optimistic for this rule. A hard 150-word floor gave the same 3 FPs but dropped short Claude imitations 38% → 5% and Test lab AI 6/11 → 2/11: rejected.
 
+## v14 (Nov 2026): mixed-writing detector, independent data, sealed test
+- **Sealed split:** `datasets.js` gives every test doc `half` = dev/final by md5(group + "|v14-seal") % 2. Before v14 the whole test split had been looked at in aggregate; only the v14 data is truly unseen.
+- **New data:**
+  - `tests/data/claude_indep/round{1,2}.jsonl` (committed): 240 responses from helper sessions running Opus/Sonnet/Haiku 5.5, which saw only the writing request (80 requests; Fable 5.1 unavailable). Split by request: ~50% train, rest test.
+  - `samples/ai_polished.jsonl` (gitignored): 24 Ghostbuster training paragraphs edited by each model, light = grammar only, heavy = "improve"; reported separately, never counted as AI.
+  - DetectRL test files (`detectrl()`, test-only, no licence file).
+  - OUTFOX (via `samples/outfox.jsonl`, test-only).
+  - DetectRL train files (`detectrlTrain()`, only with `DRL_TRAIN=1`).
+- **Shipped:** v12.3 general model + v12.3 specialists, attribution and genre models (byte-identical) + `paraModel` + `mixedModel` (cut 0.995 chosen on dev).
+- **Sealed final half:**
+
+  | | v12.3 | v14 |
+  |---|---|---|
+  | Core humans flagged | 1/7,750 | 1/7,750 (same) |
+  | Recall / AUC | 81.6% / 0.9954 | 81.6% / 0.9954 (same) |
+  | Mixed, classic set | 2.0% | 11.0% |
+  | Mixed, broad set | 11.0% | 27.3% |
+  | Humans falsely Mixed | 6/10,596 | 4 |
+  | Independent Claude | 33% | 33% (same) |
+  | DetectRL humans flagged | 13/2,600 | 13/2,600 (same) |
+  | OUTFOX ChatGPT essays | 35% | 35% (same) |
+  | AI-polished human text called AI | 0/45 | 0/45 (same) |
+
+- **Rejected (details and numbers in `docs/experiment-log.md`):**
+  - E2: mixed model on unseen docs only (too little data).
+  - E3: cross-fitted general models for mixed features (half-data copies are weaker, so their feature scale doesn't match the shipped model).
+  - E4: specialist + Sonnet/Haiku (DetectRL FPs 5 → 10).
+  - E5 / G2: full retrain with DetectRL train (core FPs 1 → 12; the 7,200 easy DetectRL humans loosen the percentile cut).
+  - E6 / G3: G2 + per-source cut (FP 0 but recall 72%; lower core AUC than v12.3).
+  - E7: paragraph and mixed models on all train (worse at equal false-Mixed).
+  - E8: specialist with per-source cut (cut → 1.0, never fires).
+  - E10: specialist with DetectRL humans + Sonnet/Haiku. Dev looked good; the sealed final run showed core FPs 1 → 5 (essays +2), so it was reverted; both final runs are logged.
+- **Bug fixed:** `toJSON` rounded tiny spreads to 0 (NaN scores); now 6 significant digits with a 1e-4 floor.
+- **Tools added:**
+  - `MODEL_OUT`, `CUT_BY_SOURCE`, `SPEC_MODELS`, `DRL_TRAIN` env options for `train.js`
+  - `tests/crossfit.js`
+  - `tests/lib/score.js` (emulates the page's Mixed for old versions)
+  - `--model=` / `--fold=` / `--variants=` for `train_mixed.js`
+- **Rebuild v14 from scratch:** v12.3 model (`tests/baselines/v12.3/model.json`) → `DRL_TRAIN=1 node tests/train_para.js` → set `paraModel.sd` zeros to 1 if an old `toJSON` was used → `DRL_TRAIN=1 node tests/train_mixed.js --fold=B --variants=3` → set `mixedModel.cut` = 0.995.
+
 ## Decisions and rejected ideas
 - **v5 fairness fixes (from real learner essays):** "I hope this helps" is a stock phrase, not a certain giveaway (a Reddit writer used it); "I think" doesn't count as casual for the too-clean rule; the hopeful-ending clue needs dialogue or fiction clichés; lists of -ing words aren't trailing clauses; each AI word counts at most twice and tier-1 everyday words count half; "Copy code" only counts on its own line.
 - **Rejected:** contractions as an AI sign. An automatic logistic fit wanted it only because the human corpus was formal; it would flag real teens.
@@ -143,6 +186,16 @@ This file gives a Claude Code session the full context of how this project was b
 - A missing final full stop only counts as a human slip when the last line is over 6 words (email sign-offs like "Best, Alex" were being counted).
 
 ## Known weak spots / next steps
+- **v14 measured weak spots:**
+  - independent Claude 5.5 ~33-40% caught (short answers ~10%)
+  - DetectRL Llama-2 / Claude-instant ~10%
+  - OUTFOX ChatGPT essays 35%
+  - paraphrased AI ~0-15%
+  - human FPs 0.5% on new domains (Reddit fiction 1.2%, arXiv 0.5%)
+  - mixed writing at sentence level never labelled Mixed
+  - classic same-topic mixed only 11%
+
+  More varied *human* training data (fiction, abstracts, casual teen writing) is the safest next lever: every attempt to add AI data without it added false flags.
 0. **v10 next steps:** real GPT-5/6, Gemini, DeepSeek and Llama samples via `tests/data/samples/` (no API keys were available); real Claude output from claude.ai collected without detector context; real human-edited AI text; more casual human writing (the genre guess often misses Reddit stories, so 11% of them land in "inconclusive"); a neural perplexity feature only if it can run and be tested in the page.
 1. **Tune on real modern data.** Ghostbuster (2023 models) is now used; still needed: real 2026 ChatGPT/Claude output and real teen writing. The owner is collecting real ChatGPT output, Claude output, their own writing and friends' casual writing, and will paste Test lab results. Use them to re-fit weights. Keep human false positives at 0 and check the human max score stays well below 55.
 2. AI told to write like a teen with lowercase starts and slang currently looks human (slips outweigh everything). Any fix must not flag real teens. Only change it with real teen text to test against.

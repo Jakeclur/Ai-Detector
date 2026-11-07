@@ -114,7 +114,7 @@
   <h1>AI Text Detector</h1>
   <p class="sub">See how many known AI-writing habits a text shows, which chatbot it looks more like, and where the AI-like parts are. You can also compare it with someone's known writing, or test the detector on your own examples.</p>
 
-  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. On a held-out test of 15,419 real human texts (including 12,428 school essays by students in grades 7–10 and essays by people learning English) it wrongly flagged 2 (about 1 in 8,000), and it caught about 4 in 5 of 7,094 chatbot texts. That drops to about 1 in 2 for recent Claude, and lower for AI text a person or a humaniser tool has edited. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
+  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain a large AI model. It looks for writing habits that chatbots overuse. On sealed test texts from the sources it was trained on (student and university essays, school essays by students in grades 7–10, stories, news, English-learner essays), it wrongly flagged 1 of 7,750 real people and caught about 4 in 5 chatbot texts. On writing from <b>unfamiliar sources</b> it is much weaker: it caught only about 1 in 3 independent Claude 5.5 texts and wrongly flagged 1 in 200 human texts from new domains (mostly online fiction and science abstracts). Edited, paraphrased, short or casual AI text often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
 
   <div class="tabs">
     <button class="tab on" data-tab="check">Check a text</button>
@@ -295,7 +295,18 @@ a Claude answer goes here…</pre>
       <tr><td>Claude Opus 5.5, held out (39) / edited Opus (15)</td><td class="n">8% / 0%</td><td class="n">36% / 40%</td></tr>
       <tr><td>Paraphrased or reworded AI text</td><td class="n">16–38%</td><td class="n">57–76%</td></tr>
     </table></div>
-    <p><b>v12.3 (current):</b> the recent-Claude check was retrained with 24 more Claude Opus 5.5 texts. On the 39 earlier held-out Opus 5.5 texts it now catches 49% (was 36%), real people wrongly flagged went 3 → 2 (no school essays), and overall AI caught stayed at 81%. Retraining the whole model with the same texts caught more Opus but flagged 6 real people, so it was rejected.</p>
+    <p><b>v14 (current, November 2026):</b> a trained <b>mixed-writing check</b> replaces the old rule. It looks at every paragraph and asks whether it reads as AI-written <i>and</i> differs from the rest of the text, having learned from real human essays how much style naturally shifts between an introduction, quotes and a conclusion. On sealed test documents never used while building it:</p>
+    <div class="tablewrap"><table>
+      <tr><th>Sealed test</th><th class="n">v12.3</th><th class="n">v14</th></tr>
+      <tr><td>Essays with a same-question ChatGPT/Claude paragraph pasted in, spotted as Mixed</td><td class="n">2%</td><td class="n">11%</td></tr>
+      <tr><td>Any document with one or two AI paragraphs pasted in, spotted as Mixed</td><td class="n">11%</td><td class="n">27%</td></tr>
+      <tr><td>Real human documents wrongly labelled Mixed (of 10,596)</td><td class="n">6</td><td class="n">4</td></tr>
+      <tr><td>Real human texts wrongly labelled "Likely AI" (core sources, of 7,750)</td><td class="n">1</td><td class="n">1</td></tr>
+      <tr><td>Independent Claude Opus / Sonnet / Haiku 5.5 texts caught (39)</td><td class="n">33%</td><td class="n">33%</td></tr>
+      <tr><td>Human paragraphs polished by Claude (grammar or "improve") called AI</td><td class="n">0 of 45</td><td class="n">0 of 45</td></tr>
+    </table></div>
+    <p>When it says Mixed it points to the pasted paragraph almost every time, but it still misses most pasted paragraphs, and it can't spot a few AI sentences spread through human writing. The main "Likely AI" model is unchanged: every attempt to retrain it with more AI data wrongly flagged more student essays somewhere, so none shipped. Full results: <code>docs/benchmark.html</code> and <code>docs/experiment-log.md</code> in the project.</p>
+    <p><b>v12.3:</b> the recent-Claude check was retrained with 24 more Claude Opus 5.5 texts. On the 39 earlier held-out Opus 5.5 texts it now catches 49% (was 36%), real people wrongly flagged went 3 → 2 (no school essays), and overall AI caught stayed at 81%. Retraining the whole model with the same texts caught more Opus but flagged 6 real people, so it was rejected.</p>
     <p><b>v12.2:</b> all 10 of those people were flagged by the recent-Claude check, not the main model, mostly on short school answers. On texts under 150 words, that check now only counts if the main model gives at least 50%. Real people wrongly flagged: 10 → 3 (school essays 8 → 1), with exactly the same AI texts caught. (This fix was found using the school essays, so their figure is a little optimistic.) Rare isn't zero, so a high score is never proof.</p>
     <p><b>v12</b> adds letter-and-punctuation pattern features and a stricter cut-off: compared with v11 it flags the same number of real people (and fewer when their text is reformatted), leaves fewer people in "inconclusive" (2.8%), and copes better with reworded sentences, while catching about 1 point less AI overall (82%). The v11 table:</p>
     <p><b>v11.</b> Trained models combine the writing-habit clues with statistical, structural and semantic features. On held-out texts the models never saw (2,339 human, 6,428 AI):</p>
@@ -560,7 +571,7 @@ if (typeof document !== "undefined") {
     const text = r.text;
     const tints = r.mix.mixed ? [[r.mix.para.start, r.mix.para.end]] : [];
     $("tintNote").textContent = !tints.length ? "" : r.mix.model
-      ? `The shaded paragraph looks AI-written and unlike the rest of the text (mixed-writing check: ${Math.round(r.mix.para.p * 100)}%; it only reports Mixed above ${Math.round(r.mix.cut * 100)}%, a level very few fully human documents reach in testing).`
+      ? `The shaded paragraph looks AI-written and unlike the rest of the text (mixed-writing check: ${(r.mix.para.p * 100).toFixed(1)}%; it only reports Mixed at ${(r.mix.cut * 100).toFixed(1)}% or more, a level very few fully human documents reached in testing).`
       : `The shaded paragraph scored ${r.mix.para.score} on its own, while the other paragraphs scored around ${r.mix.para.median}.`;
     const cuts = new Set([0, text.length]);
     r.hits.forEach(h => { cuts.add(h.start); cuts.add(h.end); });
@@ -687,7 +698,7 @@ if (typeof document !== "undefined") {
         return `<div class="seg"><div class="badge" style="background:var(--${segTone(s)})">${s.score}</div><div><b>Paragraph ${i + 1}</b> · ${plural(nWords(r.text.slice(s.start, s.end)), "word")}${s.words != null && s.words < 100 ? " · short, unreliable" : ""}${standout}<div class="note">${escH(r.text.slice(s.start, s.end).trim().slice(0, 140))}…</div></div></div>`; }).join("");
       const hi = Math.max(...segs.map(s => s.score)), lo = Math.min(...segs.map(s => s.score));
       if (r.mix.mixed) $("segs").insertAdjacentHTML("afterbegin", r.mix.model
-        ? `<p style="margin:0 0 8px;font-size:.92rem"><b>One paragraph stands out:</b> it reads as AI-written and differs in style from the other paragraphs (mixed-writing check ${Math.round(r.mix.para.p * 100)}%). People's style also shifts between an introduction, quotes and a conclusion, so this is a reason to look closer, not proof.</p>`
+        ? `<p style="margin:0 0 8px;font-size:.92rem"><b>One paragraph stands out:</b> it reads as AI-written and differs in style from the other paragraphs (mixed-writing check ${(r.mix.para.p * 100).toFixed(1)}%). People's style also shifts between an introduction, quotes and a conclusion, so this is a reason to look closer, not proof.</p>`
         : `<p style="margin:0 0 8px;font-size:.92rem"><b>One paragraph stands out:</b> it scores ${r.mix.para.score}, while the other paragraphs score around ${r.mix.para.median}. That's worth a closer look.</p>`);
       else if (r.mix && r.mix.model && r.mix.paras) $("segs").insertAdjacentHTML("afterbegin", `<p class="note" style="margin:0 0 8px">Mixed-writing check: no paragraph stands out enough to suggest part of the text was written separately by AI.</p>`);
     }

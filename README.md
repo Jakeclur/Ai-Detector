@@ -8,11 +8,12 @@ An AI-writing detector that runs entirely in your web browser. Since v10 it comb
 - **which chatbot it looks more like**, Claude or ChatGPT, with an honest confidence level
 - a **bar for every clue**, showing what pushed the score up or down
 - **highlights in the text**, so you can see exactly what was flagged and why
-- a **section-by-section scan**, and a **Mixed** result that shades one paragraph when it stands out as far more AI-like than the rest
+- a **section-by-section scan**, and a **Mixed** result (v14: a trained check) that shades one paragraph when it reads as AI-written and unlike the rest of the text
+- **sentence-level evidence**: the sentences where two or more different clues land
 
 It also has a **Compare** tab, which checks whether a text matches someone's known writing style, and a **Test lab** tab for testing the detector on your own labelled examples.
 
-There is no large AI model inside (the classifiers are sets of weights small enough to ship in the page, about 220 KB), and nothing you paste is sent anywhere.
+There is no large AI model inside (the classifiers are sets of weights small enough to ship in the page, about 400 KB), and nothing you paste is sent anywhere.
 
 > **Important:** no detector can prove who wrote something. A high score means "look closer", never proof. A low score doesn't mean a person wrote it. Don't use this to accuse anyone.
 
@@ -217,7 +218,56 @@ The released model uses a stricter cut-off (the 99.9th percentile of human score
 
 So v12 trades about 1 point of overall recall for fewer people flagged or left in the grey zone, and for better resistance to rewording. The owner's essay scores 49, "Likely human-written", just under the 50 line.
 
-### v12.3 (current): recent-Claude specialist retrained with 24 more Opus 5.5 texts
+### v14 (current): trained mixed-writing detector, independent test data, sealed final test
+
+**What changed**
+- **A trained mixed-writing check** replaces the v8 rule. Every paragraph of 30+ words gets 24 measurements:
+  - the main model's score on the paragraph
+  - a new paragraph-level classifier's score
+  - how far each score sits above the other paragraphs
+  - style and function-word distance from the rest of the document
+  - the habit-score gap
+  - position, length, quotations and citations
+
+  A small boosted-tree model, trained on 4,371 real human training documents with real AI paragraphs inserted, turns these into "probability this paragraph was written separately by AI". Natural shifts, like introductions, conclusions and quotes, are learned from the same human documents left unchanged.
+- **Sentence-level evidence.** The page lists up to three sentences where two or more *different* clues land. A single formal word on its own is never shown as evidence.
+- **Independent data.**
+  - 240 Claude Opus, Sonnet and Haiku 5.5 responses written by separate sessions that saw only a plain writing request, no detector context (`tests/data/claude_indep/`).
+  - DetectRL: GPT-3.5, Claude-instant, PaLM-2 and Llama-2 text, attacks, sentence-level mixing, and 5,203 human texts from arXiv, XSum, Reddit and Yelp.
+  - OUTFOX: 500 US grade 6–12 student essays with ChatGPT, davinci and Flan-T5 essays.
+  - 72 Claude-polished human paragraphs.
+
+  DetectRL and OUTFOX are test-only.
+- **A sealed test.** Test data is split by group into **dev**, used for every decision, and **final**, scored only by `CONFIRM_FINAL=yes node tests/benchmark.js --final` and logged in `docs/final-runs.md`. Every experiment, kept or rejected, is in `docs/experiment-log.md`.
+- **The main "Likely AI" model is unchanged from v12.3.** Retraining it with DetectRL data, or retraining the recent-Claude specialist with the independent Claude texts, always added false flags on real student essays somewhere, so none of those changes shipped (experiments E4–E10).
+
+**Sealed final half** (never used for any decision; brackets are 95% intervals)
+
+| | v12.3 | v14 |
+|---|---|---|
+| Real human texts flagged "Likely AI" (core sources) | 1 / 7,750 [0.002–0.07%] | 1 / 7,750 (unchanged) |
+| AI caught (core) / ROC-AUC | 81.6% / 0.9954 | 81.6% / 0.9954 |
+| **Mixed: same-prompt ChatGPT/Claude paragraph pasted into a student essay** | 2.0% | **11.0%** |
+| **Mixed: any genre, any position, one or two AI paragraphs** | 11.0% | **27.3%** |
+| … right paragraph pointed to, when it says Mixed | – | 99.7% (dev) |
+| Real human texts falsely labelled Mixed | 6 / 10,596 | **4** |
+| Independent Claude Opus / Sonnet / Haiku 5.5 caught (39 texts) | 33% | 33% |
+| DetectRL human texts flagged (new domains) | 13 / 2,600 (0.5%) | 13 / 2,600 |
+| DetectRL AI caught: GPT-3.5 / Claude-instant / PaLM-2 / Llama-2 | 50 / 8 / 24 / 12% | unchanged |
+| OUTFOX: ChatGPT student essays caught | 35% | 35% |
+| Claude-polished human paragraphs called AI (light / heavy) | 0/24, 0/21 | 0/24, 0/21 |
+
+**What the new independent tests show (true for v12.3 too, and now measured honestly)**
+- **On writing from sources it never trained on, the detector is far weaker.**
+  - Independent Claude 5.5: about 1 in 3 caught.
+  - Llama-2 and Claude-instant: about 1 in 10.
+  - ChatGPT essays by US school students' prompts (OUTFOX): about 1 in 3.
+- **False flags are higher on unfamiliar human writing.** On DetectRL's human texts it flags 0.5%, mostly Reddit fiction (8 of 659) and arXiv abstracts (3 of 651). Earlier versions quoted "about 1 in 8,000" from familiar sources only.
+- **Paraphrasing defeats it.** DIPPER-paraphrased ChatGPT essays: 0.4% caught. Back-translated text: 6%.
+- **Under 150 words** it catches about 1 in 10, by design.
+- **Mixed writing at sentence level** (a few AI sentences spread through human text) is not detected: 0% labelled Mixed, though 23% get a "Likely AI" result. The Mixed check works with whole paragraphs.
+
+### v12.3: recent-Claude specialist retrained with 24 more Opus 5.5 texts
 I wrote a fourth batch of 36 Opus 5.5 texts (24 for training, 12 held out), aimed at the kinds of writing most often missed: advice, reviews, tips, reflections, speeches, emails and explanations. Before any retraining, v12.2 caught 13 of the 36, which matches its 36% on the earlier held-out Opus texts.
 
 Two ways of using the new texts were tested:
@@ -485,7 +535,8 @@ For comparison, Pangram, a commercial detector that runs a real AI model, report
 - **It's unreliable under about 150 words.**
 - **v11 still misses most Claude Opus 5.5 text**: 14 of 39 held-out Opus 5.5 texts flagged (36%), and 6 of 15 edited ones (40%).
 - **Humaniser tools:** v11 ranks humanised text almost perfectly against real news but only flags about 1 in 4, because the cut-offs protect people.
-- **Pasted AI paragraphs** inside human essays are rarely spotted (9 of 375).
+- **Pasted AI paragraphs** (v14): about 1 in 4 mixed documents spotted overall, and about 1 in 9 when the pasted paragraph answers the same essay question. Single AI sentences mixed into human text aren't spotted as Mixed at all.
+- **Unfamiliar sources** (v14 independent tests): about 1 in 3 independent Claude 5.5 texts caught, about 1 in 10 for Llama-2 and Claude-instant, and 0.5% of human texts from new domains (mostly Reddit fiction and arXiv abstracts) wrongly flagged. Paraphrased AI text is almost never caught.
 - **Trained on 2023 AI text.** New models may write differently. The import folder (`tests/data/samples/`) and `node tests/train.js` let you retrain on new samples.
 - **Older notes below about v9 still apply to the rule engine.** Once a person edits them, the best it can do is "Inconclusive: possibly edited AI" (6 of 15), and edited stories and essays usually get through.
 - **The edited-AI check can be wrong about casual students.** A real student explaining something in a casual voice, with a story about their family, can trigger it (1 of 2,281 human texts did). That's why it stops at "Inconclusive". The real human test texts include few casual school answers, so the true false-alarm rate for teenagers could be higher.
@@ -573,6 +624,16 @@ node tests/train.js            # about 6 minutes: general model, two specialists
 python3 build.py
 node tests/benchmark.js        # writes docs/benchmark.html and docs/benchmark.json
 
+# v14: independent test data (test-only, gitignored) and the sealed benchmark
+bash tests/data/fetch_external.sh          # DetectRL + OUTFOX test files (add --train for DetectRL training files)
+python3 -I tests/data/outfox_to_jsonl.py   # OUTFOX pickles -> tests/data/samples/outfox.jsonl (restricted unpickler)
+node tests/benchmark.js                    # dev half: v12.3 baseline vs src/ -> docs/benchmark-dev.html/json (about 4 min)
+CONFIRM_FINAL=yes node tests/benchmark.js --final   # sealed final half, once per release -> docs/benchmark.html, docs/final-runs.md
+
+# v14: mixed-writing detector (after the general model)
+DRL_TRAIN=1 node tests/train_para.js                      # paragraph classifier on cross-fit fold A (about 13 min)
+DRL_TRAIN=1 node tests/train_mixed.js --fold=B --variants=3   # mixed model on fold B (about 4 min); then set mixedModel.cut
+
 # real Claude Opus 5.5 answers
 node tests/lab.js tests/data/opus55/tune.txt
 node tests/lab.js tests/data/opus55/holdout.txt          # kept back for checking
@@ -601,6 +662,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
 | v8 | Tested with a real student's English essay (thanks to the owner). It scored 28, "Human-leaning", but the old Mixed rule labelled it "Mixed", and the same rule hit 76 of 2,056 real human texts. **New Mixed rule:** one non-final paragraph 70+ and 40+ above the rest; shading now marks that whole paragraph. Humans labelled Mixed 76 → 6 of 2,262. Scores and AI-leaning results unchanged |
 | v9 | Bigger real-data test (5,303 human / 4,635 AI texts, incl. humaniser-tool output). In-text citations as a human sign; lone AI words count 40%; weights re-fitted; Mixed threshold 72. Humans flagged 33 → 15, AI caught 30% → 33%, with no human group getting worse |
+| v14 | Trained mixed-writing detector (paragraph classifier + mixed model) and sentence-level evidence; 240 independent Claude Opus/Sonnet/Haiku 5.5 texts, DetectRL and OUTFOX as independent test sets; sealed dev/final split, new benchmark with confidence intervals, Brier score, PR curve and length/genre breakdowns; experiment log. Main model unchanged (every retrain added student-essay false flags). Sealed final half: mixed essays 2% → 11% and 11% → 27%, humans falsely Mixed 6 → 4, "Likely AI" unchanged |
 | v12.3 | Recent-Claude specialist retrained with 24 more Opus 5.5 texts (36 written, 12 held out); the rest of v12.2 kept (a full retrain flagged more humans and was rejected). Humans flagged 3 → 2, earlier held-out Opus 36% → 49%, edited Opus 40% → 33% |
 | v12.2 | Recent-Claude specialist needs ≥50% from the main model on texts under 150 words. Held-out humans flagged 10 → 3 (ASAP school essays 8 → 1), AI caught unchanged |
 | v12.1 | No model change. Fixed a test-data bug (token-probability tables loaded as texts; real humaniser recall is 91%, not 28%); added 12,428 ASAP school essays as a test-only fairness check (8 flagged, 0.06%); new import scripts. v13 candidates (neutral essay conventions, ASAP training, bigger retrain) rejected |

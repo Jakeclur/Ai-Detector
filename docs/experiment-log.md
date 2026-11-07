@@ -113,3 +113,34 @@ Same data and weights as G2; the AI cut-off is the strictest of every human sour
 ## E8. Recent-Claude specialist with DetectRL humans, independent Sonnet/Haiku and per-source cut-off — rejected
 
 The per-source rule pushed the specialist's cut-off to 1.0 (one human source has scores at 1.0), so it never fires: independent Claude 40% → 27.5%, project Opus texts 42% → 2%. Diagnostic value: with the specialist off, the single core false flag and 2 of the 5 DetectRL false flags disappear, so the specialist carries both most of the recent-Claude detection and part of the false-flag risk.
+
+## E7. Paragraph classifier and mixed model both trained on all training documents — rejected
+
+Doubles the data for both (38,154 training paragraphs). Training cross-validation looked better (46.5% vs 42.3% at the 99.5th percentile), but on dev, at an equal number of real humans falsely labelled Mixed, it caught fewer mixed documents than the fold A / fold B version (3 false: 20.8% vs 26.5% broad, 3.9% vs 7.8% classic).
+
+## E9. Mixed cut-off chosen on dev — kept
+
+The fold A / fold B mixed model (`paraModel` trained on fold A, `mixedModel` on fold B with 3 versions per host) was swept on dev. **0.995** gives the highest broad recall with no more real humans labelled Mixed than v12.3: broad 26.5%, classic 7.8%, false Mixed 3 / 10,468 (v12.3: 9.5%, 2.4%, 5). At 0.990 recall would be 37.2% but false Mixed 9.
+
+## E10. Recent-Claude specialist with DetectRL humans and independent Sonnet/Haiku, normal cut-off — accepted on dev, REJECTED on the sealed final half
+
+Dev: core humans flagged 1 → 0, DetectRL humans 5 → 3, core recall 80.7 → 81.0%, project Opus 46.5%, edited Opus 40%, independent Claude unchanged (40%).
+Sealed final half (first run): independent Claude 33% → 54%, but core humans flagged 1 → **5** (student essays +2, ASAP +1, Reddit +1), DetectRL humans 13 → 8.
+**Decision.** Student-essay false flags rose on data never used for a decision. Hard requirement 6 puts those first, so E10 was reverted to the v12.3 specialist. The final half was then scored once more for the shipped configuration (both runs are in `docs/final-runs.md`). Lesson: a specialist change worth ±2-4 false flags looks like an improvement or a regression depending on which half you look at; at this data size its benefit can't be shown safely.
+
+## Shipped v14 configuration and sealed final result
+
+`src/model.json` = v12.3 general model, specialists, attribution and genre models (unchanged) + `paraModel` (E9) + `mixedModel` (E9, cut 0.995).
+
+| Final half (never used for decisions) | v12.3 | v14 |
+|---|---|---|
+| Core humans flagged "Likely AI" | 1 / 7,750 [0.002-0.07%] | 1 / 7,750 (unchanged) |
+| Core AI caught / ROC-AUC | 81.6% / 0.9954 | 81.6% / 0.9954 |
+| **Mixed: classic (same-prompt ChatGPT/Claude paragraph in an essay)** | 2.0% | **11.0%** |
+| **Mixed: broad (any genre, any position, 1-2 paragraphs)** | 11.0% | **27.3%** |
+| Real humans falsely labelled Mixed | 6 / 10,596 | **4** |
+| Independent Claude 5.5 caught (39 texts) | 33.3% | 33.3% |
+| DetectRL humans flagged (new domains) | 13 / 2,600 (0.5%) | 13 / 2,600 |
+| DetectRL AI caught (GPT-3.5 / Claude-instant / PaLM-2 / Llama-2) | 50 / 8 / 24 / 12% | unchanged |
+| OUTFOX ChatGPT student essays caught | 34.6% | 34.6% |
+| AI-polished human text called AI (light / heavy Claude edits) | 0/24, 0/21 | 0/24, 0/21 |
