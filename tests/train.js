@@ -51,9 +51,16 @@ function buildClassVocab(rows, n) {
   return [...df.entries()].filter(([, c]) => c / rows.length >= 0.05).sort((a, b) => b[1] - a[1]).slice(0, n).map(([t]) => t);
 }
 
+// v13: taught essay conventions get no weight in the detection models (owner's brief: "In conclusion",
+// "Moreover", a conclusion that restates the introduction etc. must not raise the score on their own).
+// They still appear in the rule-engine clue panel for information.
+const NEUTRAL_RULES = new Set(["summ", "trans"]);
+const NEUTRAL_STYLE = new Set(["intro_concl", "discourse"]);
+const NEUTRAL_TOK = new Set(["conclusion", "moreover", "furthermore", "additionally", "however", "overall", "ultimately", "therefore", "thus", "firstly", "secondly", "finally", "lastly", "consequently", "hence", "summary", "conclude", "essay", "thesis", "argues"]);
+
 function vectorise(x, spec) {
   const v = new Float64Array(spec.names.length); let i = 0;
-  if (spec.useRules) for (const k of RULE_KEYS) v[i++] = Math.min(x.rules[k], E.MODEL.cap[k] ?? Infinity);
+  if (spec.useRules) for (const k of spec.ruleKeys) v[i++] = Math.min(x.rules[k], E.MODEL.cap[k] ?? Infinity);
   if (spec.useStyle) for (const k of spec.styleKeys) v[i++] = x.style[k];
   if (spec.useVocab) { const n = Math.max(1, x.n); for (const t of spec.vocab) v[i++] = Math.sqrt((x.tok.get(t) || 0) / n * 100); }
   if (spec.useClass) { const n = Math.max(1, x.n); for (const t of spec.classVocab) v[i++] = Math.sqrt((x.cls.get(t) || 0) / n * 100); }
@@ -62,12 +69,14 @@ function vectorise(x, spec) {
 }
 
 function makeSpec(rows, opts) {
-  const styleKeys = Object.keys(rows[0].x.style);
-  const vocab = opts.useVocab ? buildVocab(rows) : [];
+  const neutral = opts.neutral !== false;
+  const styleKeys = Object.keys(rows[0].x.style).filter(k => !(neutral && NEUTRAL_STYLE.has(k)));
+  const ruleKeys = RULE_KEYS.filter(k => !(neutral && NEUTRAL_RULES.has(k)));
+  const vocab = opts.useVocab ? buildVocab(rows).filter(t => !(neutral && NEUTRAL_TOK.has(t))) : [];
   const classVocab = opts.useClass ? buildClassVocab(rows, opts.classN || 200) : [];
-  const names = [...(opts.useRules ? RULE_KEYS.map(k => "rule:" + k) : []), ...(opts.useStyle ? styleKeys.map(k => "style:" + k) : []), ...vocab.map(t => "tok:" + t), ...classVocab.map(t => "cls:" + t), ...(opts.useChr ? Array.from({ length: 512 }, (_, k) => "chr:" + k) : [])];
+  const names = [...(opts.useRules ? ruleKeys.map(k => "rule:" + k) : []), ...(opts.useStyle ? styleKeys.map(k => "style:" + k) : []), ...vocab.map(t => "tok:" + t), ...classVocab.map(t => "cls:" + t), ...(opts.useChr ? Array.from({ length: 512 }, (_, k) => "chr:" + k) : [])];
   const sign = names.map(n => n.startsWith("rule:") ? RULE_SIGN[n.slice(5)] : n.startsWith("tok:") && FAIR_NEG.test(n.slice(4)) ? -1 : n.startsWith("cls:") && n.includes("CONTR") ? -1 : 0);
-  return { ...opts, styleKeys, vocab, classVocab, names, sign };
+  return { ...opts, ruleKeys, styleKeys, vocab, classVocab, names, sign };
 }
 
 function standardise(X, spec) {
@@ -223,7 +232,7 @@ function toJSON(M) {
   const r = a => Array.from(a, v => +v.toFixed(5));
   return {
     version: 10, trained: new Date().toISOString().slice(0, 10),
-    features: M.spec.names, ruleKeys: M.spec.useRules ? RULE_KEYS : [], styleKeys: M.spec.useStyle ? M.spec.styleKeys : [], vocab: M.spec.vocab, classVocab: M.spec.classVocab || [], useChr: !!M.spec.useChr,
+    features: M.spec.names, ruleKeys: M.spec.useRules ? M.spec.ruleKeys : [], styleKeys: M.spec.useStyle ? M.spec.styleKeys : [], vocab: M.spec.vocab, classVocab: M.spec.classVocab || [], useChr: !!M.spec.useChr,
     mu: r(M.mu), sd: r(M.sd), members: M.members.map(m => ({ b: +m.b.toFixed(5), w: r(m.beta) })),
     calibration: { a: +M.cal.a.toFixed(5), c: +M.cal.c.toFixed(5) },
     cutoffs: { human: +M.cut.lo.toFixed(4), ai: +M.cut.hi.toFixed(4), genre: Object.fromEntries(Object.entries(M.cut.genre).map(([k, v]) => [k, +v.toFixed(4)])),
@@ -267,7 +276,7 @@ if (require.main === module) {
   // 4) attribution: Claude vs ChatGPT, trained on AI texts only (held-out accuracy 95-98% on real 2023 and Opus 5.5 text)
   const fam = d => /claude/.test(d.model) ? 1 : /gpt|chatgpt/.test(d.model) ? 0 : null;
   const at = rows.filter(r => r.y && fam(r.doc) !== null).map(r => ({ ...r, y: fam(r.doc), modern: /opus/.test(r.doc.model) }));
-  const A = toJSON(trainAll(at, { useRules: true, useStyle: true, useVocab: true, modernWeight: 5, humanWeight: 1 }, { l2: 0.01, gbdt: true, members: 3 }));
+  const A = toJSON(trainAll(at, { useRules: true, useStyle: true, useVocab: true, modernWeight: 5, humanWeight: 1, neutral: false }, { l2: 0.01, gbdt: true, members: 3 }));
   json.attribution = { classes: ["chatgpt", "claude"], features: A.features, ruleKeys: A.ruleKeys, styleKeys: A.styleKeys, vocab: A.vocab, mu: A.mu, sd: A.sd,
     members: A.members, calibration: A.calibration, length: A.length, gbdt: A.gbdt, trainedOn: `${at.filter(r => r.y).length} Claude and ${at.filter(r => !r.y).length} ChatGPT texts` };
   json.genreModel = GM.model;

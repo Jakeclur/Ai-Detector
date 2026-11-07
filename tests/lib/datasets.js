@@ -31,7 +31,8 @@ function walk(d) {
 const read = f => fs.readFileSync(f, "utf8");
 const num = f => parseInt(path.basename(f), 10);
 // v9 split, kept so results stay comparable: prompts 1-150 and 301-600 train, the rest test
-const ghostSplit = n => (n <= 150 || (n >= 301 && n <= 600)) ? "train" : "test";
+// v13: prompts above 900 (the extra download) split 60/40 by prompt number
+const ghostSplit = n => n > 900 ? (n % 5 < 3 ? "train" : "test") : (n <= 150 || (n >= 301 && n <= 600)) ? "train" : "test";
 // for sources without prompt numbers: a stable hash of the group id (about 60/40)
 const hashSplit = g => (parseInt(crypto.createHash("md5").update(g).digest("hex").slice(0, 8), 16) % 10) < 6 ? "train" : "test";
 
