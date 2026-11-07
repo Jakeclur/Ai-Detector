@@ -217,7 +217,27 @@ The released model uses a stricter cut-off (the 99.9th percentile of human score
 
 So v12 trades about 1 point of overall recall for fewer people flagged or left in the grey zone, and for better resistance to rewording. The owner's essay scores 49, "Likely human-written", just under the 50 line.
 
-### v12.2 (current): stricter recent-Claude specialist on short texts
+### v12.3 (current): recent-Claude specialist retrained with 24 more Opus 5.5 texts
+I wrote a fourth batch of 36 Opus 5.5 texts (24 for training, 12 held out), aimed at the kinds of writing most often missed: advice, reviews, tips, reflections, speeches, emails and explanations. Before any retraining, v12.2 caught 13 of the 36, which matches its 36% on the earlier held-out Opus texts.
+
+Two ways of using the new texts were tested:
+- **Full retrain:** held-out Opus 35% → 55%, but humans flagged rose 3 → 6 (a university essay and two school essays) and overall recall fell 81% → 76%. **Rejected.**
+- **Retrain only the recent-Claude specialist** and keep everything else from v12.2: **shipped.**
+
+| Held-out | v12.2 | v12.3 |
+|---|---|---|
+| Real human texts wrongly flagged (15,419) | 3 | **2** (two Reddit stories) |
+| … ASAP school essays (12,428) | 1 | **0** |
+| … same texts with short lines removed / on one line | 3 / 2 | 3 / **0** |
+| AI caught, overall (7,094) | 81.2% | **81.3%** |
+| **Claude Opus 5.5, earlier held-out texts (39)** | 36% | **49%** |
+| Claude Opus 5.5, new held-out batch (12) | 33% | 67% |
+| Opus 5.5 edited to sound like a student (15) | 40% | 33% |
+| ROC-AUC | 0.996 | 0.996 |
+
+The 39 earlier texts are the fairer measure, because the new held-out batch was written alongside the new training texts. One edited Opus text is no longer caught. The usual caveat applies: all the Opus 5.5 texts were written in this project's own session, by a model that knew they were for a detector. Rebuild with `V12DATA=1 SPECIALIST_ONLY=1 node tests/train.js` (about 1 minute).
+
+### v12.2: stricter recent-Claude specialist on short texts
 All 10 people still wrongly flagged in the re-test below were flagged by the **recent-Claude specialist**, not by the main model. For 8 of them, short school answers of 46–158 words, the main model gave only 5–41%. Now, on texts **under 150 words**, the specialist only counts if the main model gives at least 50%. Nothing was retrained.
 
 | Held-out, corrected data | v12.1 | v12.2 |
@@ -579,6 +599,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
 | v8 | Tested with a real student's English essay (thanks to the owner). It scored 28, "Human-leaning", but the old Mixed rule labelled it "Mixed", and the same rule hit 76 of 2,056 real human texts. **New Mixed rule:** one non-final paragraph 70+ and 40+ above the rest; shading now marks that whole paragraph. Humans labelled Mixed 76 → 6 of 2,262. Scores and AI-leaning results unchanged |
 | v9 | Bigger real-data test (5,303 human / 4,635 AI texts, incl. humaniser-tool output). In-text citations as a human sign; lone AI words count 40%; weights re-fitted; Mixed threshold 72. Humans flagged 33 → 15, AI caught 30% → 33%, with no human group getting worse |
+| v12.3 | Recent-Claude specialist retrained with 24 more Opus 5.5 texts (36 written, 12 held out); the rest of v12.2 kept (a full retrain flagged more humans and was rejected). Humans flagged 3 → 2, earlier held-out Opus 36% → 49%, edited Opus 40% → 33% |
 | v12.2 | Recent-Claude specialist needs ≥50% from the main model on texts under 150 words. Held-out humans flagged 10 → 3 (ASAP school essays 8 → 1), AI caught unchanged |
 | v12.1 | No model change. Fixed a test-data bug (token-probability tables loaded as texts; real humaniser recall is 91%, not 28%); added 12,428 ASAP school essays as a test-only fairness check (8 flagged, 0.06%); new import scripts. v13 candidates (neutral essay conventions, ASAP training, bigger retrain) rejected |
 | v12 | Hashed character 3-gram features; trained genre classifier for the "type of writing" shown; stricter cut-offs (99.9th percentile); a reformatted-human-text robustness test in the benchmark. Held-out humans flagged 2 (reformatted versions 3 → 2), humans in "inconclusive" 3.5% → 2.8%, recall 83.3% → 82.3%, sentence-level rewording 53% → 57% |

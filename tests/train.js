@@ -254,6 +254,20 @@ if (require.main === module) {
   // 0) genre classifier, for the "type of writing" shown on the page (84.6% held-out accuracy vs 35.9% for the
   //    heuristic). The cut-offs still use the heuristic genre: using the classifier for cut-offs was tested and made
   //    results slightly worse (zero-sum: tighter genres also move the high-scoring humans).
+  // SPECIALIST_ONLY=1 (v12.3): keep the shipped general model, humaniser and attribution models and retrain only the
+  // recent-Claude specialist. A full retrain with the extra Opus texts (V12DATA=1) flagged 6 humans instead of 3 and
+  // lost 5 points of recall, while this swap alone flagged 2 and raised held-out Opus 35% -> 53%.
+  if (process.env.SPECIALIST_ONLY) {
+    const old = JSON.parse(fs.readFileSync(OUT, "utf8"));
+    const spec = rows.filter(r => !r.y || r.doc.model === "claude-opus-5.5");
+    const S = toJSON(trainAll(spec, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.998, genrePct: 0.998, members: 5 }));
+    const k = old.specialists.findIndex(x => x.name === "claude-modern");
+    old.specialists[k] = { ...old.specialists[k], features: S.features, ruleKeys: S.ruleKeys, styleKeys: S.styleKeys, vocab: S.vocab, mu: S.mu, sd: S.sd,
+      members: S.members, calibration: S.calibration, cutoffs: { ai: S.cutoffs.ai }, length: S.length, trainedOn: spec.filter(r => r.y).length + " Opus 5.5 texts" };
+    fs.writeFileSync(OUT, JSON.stringify(old));
+    console.log(`specialist only: wrote ${OUT}; cut ${S.cutoffs.ai}`);
+    process.exit(0);
+  }
   const GM = trainGenre(rows);
   // 1) general model: every training text
   // cut-offs at the 99.8th / 99.9th percentile of out-of-fold human scores: by construction about 0.1-0.2% of real

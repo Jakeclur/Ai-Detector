@@ -162,3 +162,13 @@ A plain 150-word floor gave the same false-flag count but missed most short Clau
 
 **Caveat:** the rule was found by looking at the school-essay false flags, so that figure is optimistic for it.
 
+## 9. v12.3: more Opus 5.5 data, specialist-only retrain
+
+36 more Opus 5.5 texts were written (24 training, 12 held out). A full retrain with them caught more Opus (35% → 55%) but flagged 6 humans instead of 3 and lost 5 points of overall recall, so it was rejected. Retraining only the recent-Claude specialist, and keeping the rest of v12.2, gave:
+- humans flagged 3 → 2 (no school essays)
+- overall recall unchanged at 81%
+- Opus 5.5 on the 39 earlier held-out texts 36% → 49%
+- edited Opus 40% → 33% (one text)
+
+**Lesson:** a small, targeted model can absorb new data for one family without disturbing the general model's carefully set cut-offs.
+
