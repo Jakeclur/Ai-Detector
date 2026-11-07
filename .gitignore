@@ -5,3 +5,5 @@ __pycache__/
 tests/data/ghostbuster/
 tests/data/samples/*.jsonl
 !tests/data/samples/*.public.jsonl
+tests/.cache/
+tests/data/external/

@@ -9,7 +9,8 @@
 //              | "human-edited-simulated"
 //   group      documents that share a prompt or a source text share a group, so they always land in the
 //              same split (no leakage between training and testing)
-//   split      "train" | "test" (test is never used for fitting or threshold choice)
+//   split      "train" | "test" (test is never used for fitting)
+//   half       test documents only: "dev" (all decisions) or "final" (sealed; scored only by benchmark.js --final)
 //
 // Sources:
 //   - Ghostbuster (Verma et al. 2023, CC BY 3.0), downloaded by tests/data/fetch_ghostbuster.sh
@@ -143,6 +144,59 @@ function labSamples() {
   });
 }
 
+// v14: independent Claude texts written by separate Opus / Sonnet / Haiku helper sessions that saw only plain writing
+// requests (no detector context). tests/data/claude_indep/*.jsonl, one row per response:
+// { text, model, prompt, genre, length }. Split by request (all three models' answers to a request stay together):
+// about half train, the rest test (then sealed into dev/final like every other test document).
+function claudeIndep() {
+  const dir = path.join(DATA, "claude_indep"), out = [];
+  if (!fs.existsSync(dir)) return out;
+  for (const f of fs.readdirSync(dir).filter(n => n.endsWith(".jsonl")).sort()) {
+    read(path.join(dir, f)).split("\n").forEach(line => {
+      if (!line.trim()) return;
+      const o = JSON.parse(line), group = `cindep:p${o.prompt}`;
+      const h = parseInt(crypto.createHash("md5").update(group + "|v14").digest("hex").slice(0, 8), 16) % 100;
+      out.push({ text: o.text, label: "ai", model: o.model, genre: o.genre || "other", condition: o.condition || "original",
+        source: `claude_indep/${o.model}`, group, split: h < 50 ? "train" : "test", length: o.length, prompt: o.prompt });
+    });
+  }
+  return out;
+}
+
+// v14: DetectRL (Wu et al. 2024) test files, tests/data/external/detectrl (fetch_external.sh). Test-only: no licence file,
+// so never trained on. Duplicated texts across files are kept once.
+function detectrl() {
+  const dir = path.join(DATA, "external", "detectrl"), out = [];
+  if (!fs.existsSync(dir)) return out;
+  const DOM = { abstract: "academic", document: "news", story: "creative", content: "other" };
+  const MOD = { ChatGPT: "gpt-3.5-turbo", "Google-PaLM": "palm-2", "Claude-instant": "claude-instant", "Llama-2-70b": "llama-2-70b" };
+  const seen = new Set();
+  const files = fs.readdirSync(dir).filter(n => n.endsWith(".json")).sort();
+  for (const f of files) {
+    const mixHuman = /human_centered_mixing/.test(f), mixLlm = /llm_centered_mixing/.test(f), polishHuman = /paraphrase_polish_human/.test(f);
+    if (/multi_(human|llm)_mixing|data_mixing_attacks/.test(f)) continue;
+    for (const e of JSON.parse(read(path.join(dir, f)))) {
+      const text = (e.text || "").trim(); if (!text) continue;
+      const k = crypto.createHash("md5").update(text).digest("hex"); if (seen.has(k)) continue; seen.add(k);
+      let label = e.label === "llm" ? "ai" : "human", condition = "original";
+      if (label === "ai") {
+        if (mixHuman) condition = "mixed-sentences-mostly-human";
+        else if (mixLlm) condition = "mixed-sentences-mostly-ai";
+        else if (e.data_type !== "direct_prompt") condition = "drl-" + e.data_type.replace(/_llm$/, "");
+      } else if (polishHuman) { condition = "ai-polished-human"; }
+      else if (/adversarial_/.test(e.data_type)) condition = "drl-" + e.data_type.replace(/_human$/, "");
+      out.push({ text, label, model: label === "human" ? "human" : (MOD[e.llm_type] || e.llm_type), genre: DOM[e.data_type] || "other", condition,
+        source: `detectrl/${label === "human" ? "human" : MOD[e.llm_type] || e.llm_type}`, group: "drl:" + k.slice(0, 12), split: "test" });
+    }
+  }
+  return out;
+}
+
+// v14 sealed test split. Every test document is assigned once, by a hash of its group, to "dev" (used for every
+// decision: feature choice, thresholds, accept/reject) or "final" (only scored by tests/benchmark.js --final, which
+// logs each run in docs/final-runs.md). Groups never straddle the two halves.
+const sealSplit = g => (parseInt(crypto.createHash("md5").update(g + "|v14-seal").digest("hex").slice(0, 8), 16) % 2) ? "final" : "dev";
+
 // your own samples: tests/data/samples/*.jsonl
 function imported() {
   const dir = path.join(DATA, "samples"), out = [];
@@ -163,8 +217,8 @@ function imported() {
 let cache = null;
 function all() {
   if (cache) return cache;
-  cache = [...ghostbuster(), ...repoCorpus(), ...opus55(), ...labSamples(), ...imported()].filter(d => d.text && d.text.trim());
-  cache.forEach((d, i) => { d.key = i; });
+  cache = [...ghostbuster(), ...repoCorpus(), ...opus55(), ...labSamples(), ...imported(), ...claudeIndep(), ...detectrl()].filter(d => d.text && d.text.trim());
+  cache.forEach((d, i) => { d.key = i; if (d.split === "test") { d.half = sealSplit(d.group); } });
   return cache;
 }
 
@@ -191,4 +245,4 @@ function leakageReport(docs) {
   return hits;
 }
 
-module.exports = { markLeaks, all, ghostbuster, repoCorpus, opus55, labSamples, imported, leakageReport };
+module.exports = { markLeaks, all, ghostbuster, repoCorpus, opus55, labSamples, imported, leakageReport, claudeIndep, detectrl, sealSplit };
