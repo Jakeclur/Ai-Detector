@@ -51,7 +51,7 @@ function ghostbuster() {
       const group = dom === "reuter" ? `reuter:${author}` : `${dom}:${n}`;
       const split = dom === "reuter" ? hashSplit(group) : ghostSplit(n);
       out.push({ text: read(f), label: src === "human" ? "human" : "ai", model: MODEL[src], genre: DOM[dom],
-        condition: src.startsWith("gpt_") ? "prompt-variant" : "original", source: `ghostbuster/${dom}/${src}`, group, split });
+        condition: src.startsWith("gpt_") ? "prompt-variant" : "original", source: `ghostbuster/${dom}/${src}`, group, split, fileNo: n });
     }
   }
   const LEARN = ["ets", "lang8", "pelic", "toefl91", "bawe"];
@@ -59,7 +59,7 @@ function ghostbuster() {
     // learner corpora contain exact duplicates under different numbers: group by content
     const text = read(f), group = `${s}:` + crypto.createHash("md5").update(text.replace(/\s+/g, " ").trim().slice(0, 400)).digest("hex").slice(0, 10);
     out.push({ text, label: "human", model: "human", genre: s === "bawe" ? "academic" : "learner", condition: "original",
-      source: `ghostbuster/other/${s}`, group, split: hashSplit(group) });
+      source: `ghostbuster/other/${s}`, group, split: hashSplit(group), fileNo: num(f) });
   }
   for (const f of walk(path.join(GB, "other", "gptzero"))) {
     const lab = f.includes(`${path.sep}gpt${path.sep}`) ? "ai" : "human";
@@ -121,6 +121,11 @@ function opus55() {
   const B3H = ["creative", "creative", "creative", "news", "news", "academic", "academic", "conversational", "explanation", "academic", "explanation", "conversational", "conversational", "explanation", "other"];
   if (fs.existsSync(path.join(dir, "batch3_tune.txt"))) labFile(path.join(dir, "batch3_tune.txt")).forEach((o, i) => out.push({ text: o.text, label: "ai", model: "claude-opus-5.5", genre: B3T[i] || "other", condition: "original", source: "opus55/batch3_tune", group: `opus:b3t${i}`, split: "train" }));
   if (fs.existsSync(path.join(dir, "batch3_holdout.txt"))) labFile(path.join(dir, "batch3_holdout.txt")).forEach((o, i) => out.push({ text: o.text, label: "ai", model: "claude-opus-5.5", genre: B3H[i] || "other", condition: "original", source: "opus55/batch3_holdout", group: `opus:b3h${i}`, split: "test" }));
+  // fourth batch (v12.3): advice, reviews, tips, reflections, plus stories, emails, explanations, essays and news
+  const B4T = ["creative", "creative", "creative", "creative", "news", "news", "academic", "academic", "academic", "conversational", "conversational", "conversational", "explanation", "explanation", "explanation", "other", "other", "other", "other", "other", "other", "explanation", "explanation", "other"];
+  const B4H = ["creative", "creative", "news", "academic", "conversational", "explanation", "explanation", "other", "other", "other", "explanation", "other"];
+  if (fs.existsSync(path.join(dir, "batch4_tune.txt"))) labFile(path.join(dir, "batch4_tune.txt")).forEach((o, i) => out.push({ text: o.text, label: "ai", model: "claude-opus-5.5", genre: B4T[i] || "other", condition: "original", source: "opus55/batch4_tune", group: `opus:b4t${i}`, split: "train" }));
+  if (fs.existsSync(path.join(dir, "batch4_holdout.txt"))) labFile(path.join(dir, "batch4_holdout.txt")).forEach((o, i) => out.push({ text: o.text, label: "ai", model: "claude-opus-5.5", genre: B4H[i] || "other", condition: "original", source: "opus55/batch4_holdout", group: `opus:b4h${i}`, split: "test" }));
   // refined versions share the group of their original (tune passages 2,5,7,8,11,13,16,19 / hold-out 3,12,15,18,30,36,40)
   const RT = [1, 3, 4, 5, 7, 8, 10, 12], RH = [0, 3, 4, 5, 9, 11, 13];
   labFile(path.join(dir, "refined_tune.txt")).forEach((o, i) => out.push({ text: o.text, label: "ai", model: "claude-opus-5.5", genre: OPUS_TUNE_GENRE[RT[i]] || "other", condition: "human-edited-simulated", source: "opus55/refined_tune", group: `opus:t${RT[i]}`, split: "test" }));

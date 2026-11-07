@@ -223,6 +223,8 @@ function loadRows(split) {
   for (const d of docs) {
     if (d.split !== split || d.leak) continue;
     if (split === "train" && (d.condition.includes("@") || d.condition === "human-edited-simulated")) continue;
+    // V12DATA=1: train on the v12-era download only (files 1-900, Reuters 1-6 per journalist); the test split is unchanged
+    if (split === "train" && process.env.V12DATA && d.fileNo && d.fileNo > (d.source.startsWith("ghostbuster/reuter/") ? 6 : 900)) continue;
     const x = extract(d); if (!x) continue;
     rows.push({ x, y: d.label === "ai" ? 1 : 0, group: d.group, doc: d, modern: /opus-5\.5|imitation/.test(d.model) });
   }

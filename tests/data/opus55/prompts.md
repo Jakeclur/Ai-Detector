@@ -67,3 +67,15 @@ Same session, same caveat. batch3_tune.txt: 1–5 short stories (a boy who carri
 batch3_holdout.txt: 1–3 short stories (snow and a grandfather's hat, a letter from your 8-year-old self, a night in hospital); 4–5 news reports (Gold Coast light rail, a new Kimberley gecko); 6–7 essays (Romeo and Juliet, primary school homework); 8 casual email declining a party; 9 explanation (herd immunity); 10 drama reflection; 11 explanation (why the sea is salty); 12 casual post about a group project; 13 parent email to a teacher; 14 explanation (thunderstorms); 15 book review (Holes).
 
 Names, figures and news events in these passages are invented for the writing tasks.
+
+## Fourth batch (v12.3): batch4_tune.txt (24) and batch4_holdout.txt (12)
+
+Same session, same caveat (the model knew these were for a detector and had read its clue lists). Weighted towards the "other" type of writing (advice, reviews, tips, reflections, speeches), where most held-out misses were.
+
+batch4_tune.txt: 1–4 short stories (a delivery driver and a stray dog, a 1987 letter in a library book, the last lemon tree on a space station, fishing with a grandfather); 5–6 news reports (a Toowoomba skate park, earlier coral spawning); 7–9 essays (technology and loneliness, causes of WWI, loneliness in Of Mice and Men); 10–12 messages (missing a friend's party, a leave request, a forum reply on learning guitar); 13–15 explanations (vaccines, why the sky is blue, compound interest); 16 study tips; 17 product description; 18 job interview tips; 19 pancake recipe; 20 camp reflection; 21 18th birthday speech; 22 iPad vs laptop; 23 is a second language worth learning; 24 three days in Melbourne.
+
+batch4_holdout.txt: 1–2 short stories (a blackout card game, an underdog chess club); 3 news report (Ipswich library hours); 4 essay (renewable energy in Australia); 5 email to a coach; 6–7 explanations (how planes fly, recessions); 8 dealing with stress; 9 café review; 10 saving money as a teen; 11 should I learn coding; 12 food bank reflection.
+
+Before any retraining, the v12.2 model caught 13 of these 36 (tune 9/24, hold-out 4/12), in line with its 36% on the earlier held-out Opus texts.
+
+Names, places, organisations and figures in these passages are invented for the writing tasks (the news reports are fictional).
