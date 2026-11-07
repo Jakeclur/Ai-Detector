@@ -24,7 +24,9 @@ const run = t => {
 };
 const lean = r => r.attr ? r.attr.lean : "unclear";
 const row = r => ({ p: r.likelihood, band: r.band, wc: r.wc, lean: lean(r), cg: r.cutGenre || null, spec: r.specialist ? r.specialist.name : null,
-  mixedPara: r.mixedPara != null ? r.mixedPara : null, conf: r.confidence || null });
+  mixedPara: r.mixedPara != null ? r.mixedPara : null, conf: r.confidence || null,
+  mixP: r.mix && r.mix.paras && r.mix.paras.length ? Math.max(...r.mix.paras.map(q => q.p)) : null,
+  mixIdx: r.mix && r.mix.paras && r.mix.paras.length ? (() => { const b = r.mix.paras.reduce((a, q) => q.p > a.p ? q : a); return paraIndex(r.text, b.start); })() : null });
 
 const out = { half, src: srcDir, docs: {}, mixed: {}, reformatted: {}, polished: [] };
 let n = 0; const t0 = Date.now();

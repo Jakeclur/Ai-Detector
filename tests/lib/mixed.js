@@ -15,8 +15,8 @@ function rng(seed) { let x = h32(String(seed)) || 1; return () => { x ^= x << 13
 const HOST_GENRES = new Set(["academic", "creative", "news", "learner", "explanation", "other"]);
 const paras = t => t.split(/\n\s*\n|\n/).map(p => p.trim()).filter(Boolean);
 const goodHostPara = p => nw(p) >= 25;
-// AI paragraphs that a student could plausibly paste: prose, 45-180 words, no list or heading markup
-const goodAiPara = p => { const w = nw(p); return w >= 45 && w <= 180 && !/^(#|[-*•]|\d+[.)]|\*\*[^*]+\*\*\s*$)/.test(p) && !/:\s*$/.test(p) && !/\n[-*•]/.test(p); };
+// AI paragraphs that a student could plausibly paste: prose, 30-320 words (a narrower range let the model learn the range itself), no list or heading markup
+const goodAiPara = p => { const w = nw(p); return w >= 30 && w <= 320 && !/^(#|[-*•]|\d+[.)]|\*\*[^*]+\*\*\s*$)/.test(p) && !/:\s*$/.test(p) && !/\n[-*•]/.test(p); };
 
 function buildMixed(docs, inSplit, opts = {}) {
   const R = rng(opts.seed || "mixed");
@@ -30,6 +30,20 @@ function buildMixed(docs, inSplit, opts = {}) {
     if (!byGenre.has(x.d.genre)) byGenre.set(x.d.genre, []); byGenre.get(x.d.genre).push(x);
   }
   const out = [];
+  // opts.variants > 1 (training only): extra mixed versions of each host with other donors (any AI source, including
+  // modern Claude), drawn from a separate random stream so the default (dev / final test sets) is unchanged
+  if (opts.variants > 1) {
+    const R2 = rng((opts.seed || "mixed") + "-variants"), allD = donors;
+    for (const { d, ps } of hosts) for (let v = 1; v < opts.variants; v++) {
+      const pool = R2() < 0.5 ? (byGenre.get(d.genre === "learner" ? "academic" : d.genre) || allD) : allD;
+      const don = pool[Math.floor(R2() * pool.length)]; if (!don) continue;
+      const two = R2() < 0.3 && don.ps.length >= 2, start = Math.floor(R2() * Math.max(1, don.ps.length - (two ? 1 : 0)));
+      const ins = two ? don.ps.slice(start, start + 2) : [don.ps[start]];
+      const hp = ps.filter(p => nw(p) >= 8), k = Math.floor(R2() * (hp.length + 1));
+      const all = [...hp.slice(0, k), ...ins, ...hp.slice(k)];
+      out.push({ text: all.join("\n\n"), human: hp.join("\n\n"), aiParas: ins.map((_, i) => k + i), paras: all, host: d, donor: don.d, sameTopic: don.d.group === d.group, variant: v });
+    }
+  }
   for (const { d, ps } of hosts) {
     // prefer an AI answer to the same prompt (same topic), otherwise the same genre
     const pool = byGroup.get(d.group) || byGenre.get(d.genre === "learner" ? "academic" : d.genre) || [];

@@ -192,6 +192,32 @@ function detectrl() {
   return out;
 }
 
+// v14 experiment: DetectRL *train* files (tests/data/external/detectrl_train, fetch_external.sh --train), used for training
+// only when DRL_TRAIN=1. Plain, few-shot and style-mimicking (SICO) prompts from GPT-3.5, Claude-instant, PaLM-2 and
+// Llama-2-70b, plus all human texts. Paraphrased and perturbed variants are left out (training on augmented text hurt in v11).
+function detectrlTrain() {
+  const dir = path.join(DATA, "external", "detectrl_train"), out = [];
+  if (!process.env.DRL_TRAIN || !fs.existsSync(dir)) return out;
+  const DOM = { abstract: "academic", document: "news", story: "creative", content: "other" };
+  const MOD = { ChatGPT: "gpt-3.5-turbo", "Google-PaLM": "palm-2", "Claude-instant": "claude-instant", "Llama-2-70b": "llama-2-70b" };
+  const PER = { direct_prompt: +(process.env.DRL_N || 500), prompt_few_shot: Math.round((+(process.env.DRL_N || 500)) / 2), prompt_SICO: Math.round((+(process.env.DRL_N || 500)) / 2) };
+  const seen = new Set();
+  for (const f of fs.readdirSync(dir).filter(n => n.endsWith(".json")).sort()) {
+    const cnt = {};
+    for (const e of JSON.parse(read(path.join(dir, f)))) {
+      const text = (e.text || "").trim(); if (!text) continue;
+      const k = crypto.createHash("md5").update(text).digest("hex"); if (seen.has(k)) continue;
+      const human = e.label !== "llm";
+      if (!human) { if (!(e.data_type in PER)) continue; cnt[e.data_type] = (cnt[e.data_type] || 0) + 1; if (cnt[e.data_type] > PER[e.data_type]) continue; }
+      else if (!(e.data_type in DOM)) continue;
+      seen.add(k);
+      out.push({ text, label: human ? "human" : "ai", model: human ? "human" : MOD[e.llm_type] || e.llm_type, genre: human ? DOM[e.data_type] : "other",
+        condition: human || e.data_type === "direct_prompt" ? "original" : "prompt-variant", source: `detectrl_train/${human ? "human" : MOD[e.llm_type]}`, group: "drlt:" + k.slice(0, 12), split: "train" });
+    }
+  }
+  return out;
+}
+
 // v14 sealed test split. Every test document is assigned once, by a hash of its group, to "dev" (used for every
 // decision: feature choice, thresholds, accept/reject) or "final" (only scored by tests/benchmark.js --final, which
 // logs each run in docs/final-runs.md). Groups never straddle the two halves.
@@ -217,7 +243,7 @@ function imported() {
 let cache = null;
 function all() {
   if (cache) return cache;
-  cache = [...ghostbuster(), ...repoCorpus(), ...opus55(), ...labSamples(), ...imported(), ...claudeIndep(), ...detectrl()].filter(d => d.text && d.text.trim());
+  cache = [...ghostbuster(), ...repoCorpus(), ...opus55(), ...labSamples(), ...imported(), ...claudeIndep(), ...detectrl(), ...detectrlTrain()].filter(d => d.text && d.text.trim());
   cache.forEach((d, i) => { d.key = i; if (d.split === "test") { d.half = sealSplit(d.group); } });
   return cache;
 }

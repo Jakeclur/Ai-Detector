@@ -37,3 +37,54 @@ Brackets are 95% intervals.
 
 **Reading.** The model is strong on the sources it was trained on (Ghostbuster-style essays, stories, news) and weak on
 new sources: other model families, other domains, short answers and student-essay ChatGPT. Mixed detection barely works.
+
+## E1. Trained mixed-authorship model (paragraph level) — kept, then improved in E3
+
+**What.** `paraFeatures` / `mixedScore` in `src/ensemble.js`: 21 features per paragraph (the general model's score on the paragraph, its gap to the other paragraphs' median and maximum, style-vector distance from the rest of the document and how unusual that distance is within the document, function-word delta against the rest, rule-score gap, position, length, quoted text, citations, whole-document score, feature-family contributions). Boosted trees (300 depth-3 trees), balanced Platt calibration, document score = best paragraph. Cut-off = 99.8th percentile of out-of-fold best-paragraph scores on real human training documents. `assess()` now decides Mixed itself; the v8 rule is a fallback when no model is loaded.
+**Training data.** Training split only: 2,865 human documents with 3+ paragraphs, each used as is and with 1-2 real AI paragraphs inserted from a training AI document (same prompt when possible), `tests/train_mixed.js`.
+**Dev result.** Real humans labelled Mixed 5 → **0** / 10,468; broad mixed set 9.5% → **13.8%**; classic 2.4% → 2.0%; core "Likely AI" unchanged.
+**Problem found.** Training cross-validation said 32% at the same cut, dev only 14%: on training documents the general model's paragraph scores are over-confident (it trained on them), and the mixed model learned to expect that.
+
+## E2. Mixed model trained only on documents the general model never saw — rejected
+
+Only 872 hosts qualify (55 essays). Dev broad recall 9.1% (worse than E1's 13.8%). Too little data.
+
+## E4. Recent-Claude specialist retrained with the independent Sonnet and Haiku training texts — rejected
+
+Independent Claude dev 40% → 45% (Opus 54 → 62%, Sonnet 43 → 50%), edited Opus 30 → 50%, but humans flagged rose: core 1 → 3 (ASAP +1, Lang-8 +1), DetectRL humans 5 → 10. The specialist's strict cut-off is set on training humans; on human domains it never saw (arXiv, XSum, Yelp) it fires more. Points to the need for more varied *human* training data.
+
+## E3. Cross-fitted general-model scores for mixed training — rejected (diagnosis was wrong)
+
+Two half-data copies of the general model (`tests/crossfit.js`) to give the mixed model "unseen" paragraph scores. Dev broad recall fell to 2.2% (raw logits) and 0.0% (calibrated logits). A direct check showed the shipped model is **not** over-confident on its training documents (median AI-paragraph logit 3.49 on train vs 3.51 on dev); the half-data copies are simply weaker models (median 0.93-1.10), so their feature distribution doesn't match the shipped model at run time. The E1 train/dev gap comes from elsewhere (different hosts and donors: dev includes OUTFOX hosts and Flan-T5 / davinci / 2023-Claude donors that were rare in training).
+
+## E3b. Three mixed versions per training host, more AI paragraph sources — kept for comparison
+
+2,865 hosts × 3 versions (extra donors from any AI source incl. modern Claude and DetectRL). Dev cut-off sweep (document cut-off on the mixed-model probability):
+
+| Cut-off | Broad recall | Real humans falsely Mixed (of 10,468) |
+|---|---|---|
+| 0.990 | 32.8% | 9 |
+| 0.995 | 22.8% | 3 |
+| 0.998 | 9.8% | 0 |
+
+At the shipped training-percentile cut (0.9975) it gave 12.0% / 1 false Mixed. Classic set stays hard (4.9% at 0.995).
+
+## E5. Full general-model retrain with DetectRL training data and the independent Claude training half (G2) — rejected
+
+`DRL_TRAIN=1 V12DATA=1 node tests/train.js`: adds 7,200 DetectRL human texts (arXiv, XSum, WritingPrompts, Yelp) and 4,000 AI texts from GPT-3.5, Claude-instant, PaLM-2, Llama-2 (plain, few-shot, style-mimicking prompts), plus 120 independent Claude training texts.
+
+| Dev | v12.3 | G2 |
+|---|---|---|
+| Core humans flagged | 1 / 7,664 | **12** (essays 0 → 6, ASAP +3, BAWE +1, Reddit +1) |
+| Core recall / AUC | 80.7% / 0.9954 | 83.0% / 0.9938 |
+| DetectRL AI caught (Claude-instant / PaLM-2 / Llama-2) | 3.9 / 12.5 / 5.6% | 6.6 / 21.3 / 14.1% |
+| DetectRL humans flagged | 5 / 2,550 | 4 |
+| Independent Claude (Haiku) | 40% (23%) | 45% (38%) |
+| Under-150-word texts caught / humans flagged | 9.9% / 0 | 27.8% / 4 |
+| AI-polished heavy edits called AI | 0/15 | 3/15 |
+
+**Why the false flags.** The AI cut-off is a percentile of *all* training humans. 7,200 easy DetectRL humans pull that percentile down, loosening the cut for harder groups (student essays). Next: E6.
+
+## E5b. Bug fixed: tiny feature spreads rounded to zero
+
+`toJSON` stored standard deviations with `toFixed(5)`; a near-constant feature (`style:para_n` in the paragraph model) became 0 and every score became NaN. Now stored with 6 significant digits and a 1e-4 floor. The shipped general model was not affected (no zero spreads).

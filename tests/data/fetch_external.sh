@@ -25,4 +25,10 @@ for f in common/test/test_humans common/test/test_problem_statements chatgpt/tes
          dipper/chatgpt/test_attacks text_davinci_003/test/test_lms flan_t5_xxl/test/test_lms; do
   out="$dest/outfox/$(echo "$f" | tr / _).pkl"; [ -s "$out" ] || curl -sSfL --retry 3 "$O/$f.pkl" -o "$out"
 done
+if [ "${1:-}" = "--train" ]; then   # DetectRL training files (only used with DRL_TRAIN=1)
+  mkdir -p "$dest/detectrl_train"
+  for f in multi_llms_ChatGPT_train multi_llms_Claude-instant_train multi_llms_Google-PaLM_train multi_llms_Llama-2-70b_train; do
+    out="$dest/detectrl_train/$f.json"; [ -s "$out" ] || curl -sSfL --retry 3 "$R/Multi_LLM/$f.json" -o "$out"
+  done
+fi
 ls -la "$dest"/*/ | head -40

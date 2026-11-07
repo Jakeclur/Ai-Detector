@@ -24,7 +24,7 @@ const GB = require("./lib/gbdt.js");
 const GBDT_OPTS = { trees: 250, depth: 3, lr: 0.08, lambda: 5, minLeaf: 40, colsample: 0.5 };
 
 const ARGS = process.argv.slice(2);
-const OUT = path.join(__dirname, "../src/model.json");
+const OUT = process.env.MODEL_OUT || path.join(__dirname, "../src/model.json");   // v14: MODEL_OUT writes an experiment elsewhere
 let HUMAN_WEIGHT = 2, MODERN_WEIGHT = 8;   // modern (2025-26) AI samples are few, so each counts more
 const RULE_KEYS = Object.keys(E.MODEL.w);
 const RULE_SIGN = Object.fromEntries(RULE_KEYS.map(k => [k, E.MODEL.w[k] < 0 || k === "cite" ? -1 : 1]));
@@ -149,7 +149,7 @@ function platt(z, y) {
   return { a, c };
 }
 
-function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2, gbdt = false } = {}) {
+function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2, gbdt = false, cutBySource = false } = {}) {
   if (l2 != null) L2 = l2;
   if (opts.modernWeight != null) MODERN_WEIGHT = opts.modernWeight;
   if (opts.humanWeight != null) HUMAN_WEIGHT = opts.humanWeight;
@@ -165,7 +165,13 @@ function trainAll(rows, opts, { members = 7, hiPct = 0.997, genrePct = 0.998, l2
   const prob = z => 1 / (1 + Math.exp(-(cal.a * z + cal.c)));
   const pct = (a, q) => { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
   const humP = rows.map((r, i) => [r, prob(oof[i])]).filter(([r]) => !r.y);
-  const globalHi = pct(humP.map(x => x[1]), hiPct), globalLo = Math.max(0.5, pct(humP.map(x => x[1]), 0.95));
+  let globalHi = pct(humP.map(x => x[1]), hiPct); const globalLo = Math.max(0.5, pct(humP.map(x => x[1]), 0.95));
+  // v14 cutBySource: the AI cut-off is at least every human source's own hiPct percentile (sources with 200+ texts),
+  // so adding a large, easy human source (e.g. DetectRL) can't loosen the cut-off for harder ones (student essays)
+  if (cutBySource) {
+    const bySrc = new Map(); for (const [r, p] of humP) { const k = r.doc ? r.doc.source : "?"; if (!bySrc.has(k)) bySrc.set(k, []); bySrc.get(k).push(p); }
+    for (const [k, ps] of bySrc) if (ps.length >= 200) globalHi = Math.max(globalHi, pct(ps, hiPct));
+  }
   const genreCut = {}, genreLo = {};
   for (const g of ["academic", "creative", "news", "explanation", "conversational", "learner", "other"]) {
     const ps = humP.filter(([r]) => r.x.genre === g).map(x => x[1]);
@@ -236,7 +242,8 @@ function toJSON(M) {
   return {
     version: 10, trained: new Date().toISOString().slice(0, 10),
     features: M.spec.names, ruleKeys: M.spec.useRules ? M.spec.ruleKeys : [], styleKeys: M.spec.useStyle ? M.spec.styleKeys : [], vocab: M.spec.vocab, classVocab: M.spec.classVocab || [], useChr: !!M.spec.useChr,
-    mu: r(M.mu), sd: r(M.sd), members: M.members.map(m => ({ b: +m.b.toFixed(5), w: r(m.beta) })),
+    mu: r(M.mu), sd: Array.from(M.sd, v => +Math.max(v, 1e-4).toPrecision(6)), members:   // v14: tiny spreads were rounded to 0 (divide by zero)
+    M.members.map(m => ({ b: +m.b.toFixed(5), w: r(m.beta) })),
     calibration: { a: +M.cal.a.toFixed(5), c: +M.cal.c.toFixed(5) },
     cutoffs: { human: +M.cut.lo.toFixed(4), ai: +M.cut.hi.toFixed(4), genre: Object.fromEntries(Object.entries(M.cut.genre).map(([k, v]) => [k, +v.toFixed(4)])),
       humanGenre: Object.fromEntries(Object.entries(M.cut.genreLo || {}).map(([k, v]) => [k, +v.toFixed(4)])) },
@@ -259,8 +266,9 @@ if (require.main === module) {
   // lost 5 points of recall, while this swap alone flagged 2 and raised held-out Opus 35% -> 53%.
   if (process.env.SPECIALIST_ONLY) {
     const old = JSON.parse(fs.readFileSync(OUT, "utf8"));
-    const spec = rows.filter(r => !r.y || r.doc.model === "claude-opus-5.5");
-    const S = toJSON(trainAll(spec, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.998, genrePct: 0.998, members: 5 }));
+    const SPEC_RE = new RegExp(process.env.SPEC_MODELS || "^claude-opus-5\\.5$");   // v14: SPEC_MODELS="^claude-(opus|sonnet|haiku)-5\\.5$" adds the independent Sonnet / Haiku texts
+    const spec = rows.filter(r => !r.y || SPEC_RE.test(r.doc.model));
+    const S = toJSON(trainAll(spec, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.998, genrePct: 0.998, members: 5, cutBySource: !!process.env.CUT_BY_SOURCE }));
     const k = old.specialists.findIndex(x => x.name === "claude-modern");
     old.specialists[k] = { ...old.specialists[k], features: S.features, ruleKeys: S.ruleKeys, styleKeys: S.styleKeys, vocab: S.vocab, mu: S.mu, sd: S.sd,
       members: S.members, calibration: S.calibration, cutoffs: { ai: S.cutoffs.ai }, length: S.length, trainedOn: spec.filter(r => r.y).length + " Opus 5.5 texts" };
@@ -276,18 +284,19 @@ if (require.main === module) {
   // v12: + hashed character 3-grams (useChr). At zero held-out false positives they raised recall 81.9% -> 85.6%
   // (humaniser text 46% -> 67%, Claude 2023 54% -> 64%, paraphrased 64% -> 70%). Cut-offs at the 99.9th / 99.95th
   // percentile: at 99.8th the new model flagged one more reformatted human essay than v11, so it was made stricter.
-  const M = trainAll(rows, { useRules: true, useStyle: true, useVocab: true, useChr: true, modernWeight: 8, humanWeight: 2 }, { l2: 0.01, gbdt: true, hiPct: 0.999, genrePct: 0.9995 });
+  const M = trainAll(rows, { useRules: true, useStyle: true, useVocab: true, useChr: true, modernWeight: 8, humanWeight: 2 }, { l2: 0.01, gbdt: true, hiPct: 0.999, genrePct: 0.9995, cutBySource: !!process.env.CUT_BY_SOURCE });
   const json = toJSON(M);
   // 2) specialist for recent Claude: Opus 5.5 texts vs all human texts, with a stricter cut-off.
   //    The general model is dominated by 2023 writing; this one only looks for what separates modern Claude.
-  const spec = rows.filter(r => !r.y || r.doc.model === "claude-opus-5.5");
-  const S = toJSON(trainAll(spec, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.998, genrePct: 0.998, members: 5 }));
+  const SPEC_RE = new RegExp(process.env.SPEC_MODELS || "^claude-opus-5\\.5$");   // v14: SPEC_MODELS="^claude-(opus|sonnet|haiku)-5\\.5$" adds the independent Sonnet / Haiku texts
+    const spec = rows.filter(r => !r.y || SPEC_RE.test(r.doc.model));
+  const S = toJSON(trainAll(spec, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.998, genrePct: 0.998, members: 5, cutBySource: !!process.env.CUT_BY_SOURCE }));
   json.specialists = [{ name: "claude-modern", label: "recent Claude (Opus 5.5-like)", features: S.features, ruleKeys: S.ruleKeys, styleKeys: S.styleKeys, vocab: S.vocab,
     mu: S.mu, sd: S.sd, members: S.members, calibration: S.calibration, cutoffs: { ai: S.cutoffs.ai }, length: S.length, trainedOn: spec.filter(r => r.y).length + " Opus 5.5 texts",
     minGeneral: 0.05, minWords: 150, shortMinGeneral: 0.5 }];   // v12.2: under 150 words the general model must give >= 50% (it flagged 7 short real school answers, ASAP)   // only counts when the general model gives at least 5%: stops extreme disagreements (a Reddit dialogue story scored 0 vs 0.92)
   // 3) humaniser specialist: AI text run through a humaniser tool vs all human texts (strict cut-off)
   const hum = rows.filter(r => !r.y || r.doc.condition === "humaniser");
-  const HS = toJSON(trainAll(hum, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.999, genrePct: 0.999, members: 5 }));
+  const HS = toJSON(trainAll(hum, { useRules: true, useStyle: true, useVocab: true, modernWeight: 1, humanWeight: 1 }, { l2: 0.03, hiPct: 0.999, genrePct: 0.999, members: 5, cutBySource: !!process.env.CUT_BY_SOURCE }));
   json.specialists.push({ name: "humaniser", label: "AI text run through a humaniser tool", features: HS.features, ruleKeys: HS.ruleKeys, styleKeys: HS.styleKeys, vocab: HS.vocab,
     mu: HS.mu, sd: HS.sd, members: HS.members, calibration: HS.calibration, cutoffs: { ai: HS.cutoffs.ai }, length: HS.length, minGeneral: 0.05 });
   // 4) attribution: Claude vs ChatGPT, trained on AI texts only (held-out accuracy 95-98% on real 2023 and Opus 5.5 text)

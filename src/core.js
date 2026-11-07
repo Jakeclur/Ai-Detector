@@ -614,4 +614,4 @@ function compareStyles(known, unknown) {
   return { delta, level, diffs, nA: A.n, nB: B.n };
 }
 // ==/CORE==
-if (typeof module !== "undefined") module.exports = { paraSplit, mixedCheck, MIXED_RULE, suspect, compareStyles, englishCoverage, cleanText, features, analyze, scoreFeatures, MODEL, BANDS, attribute, segments, slidingWindow, cautions, nWords };
+if (typeof module !== "undefined") module.exports = { FW_STATS, paraSplit, mixedCheck, MIXED_RULE, suspect, compareStyles, englishCoverage, cleanText, features, analyze, scoreFeatures, MODEL, BANDS, attribute, segments, slidingWindow, cautions, nWords };

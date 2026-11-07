@@ -204,6 +204,7 @@
         <h2>Flagged text</h2>
         <p class="h2note">Hover or tap a highlight to see why it was flagged. <span id="tintNote"></span></p>
         <div id="marked"></div>
+        <div id="sentEv" class="hide" style="margin-top:12px"></div>
         <div class="legend">
           <span style="--c:var(--hl-hard)">certain giveaway</span>
           <span style="--c:var(--hl-word)">AI-favoured word</span>
@@ -437,7 +438,8 @@ if (typeof document !== "undefined") {
     const text = r.text;
     r.segs = segments(text).filter(s => s.score != null);
     r.paras = paragraphView(text);
-    r.mix = mixedCheck(text, r);
+    // v14: assess() decides Mixed with the trained paragraph model; the v8 rule is only a fallback without a model
+    if (!r.mix || !r.mix.model) r.mix = mixedCheck(text, r);
     r.cautions = cautions(r);
     if (r.f.tooClean) r.cautions.push("This text sounds casual but is unusually tidy (no slips, even rhythm, neat ending). Some careful human writers write like this, so don't read much into that clue alone.");
     if (r.mix.mixed && r.band !== "ai") {
@@ -459,7 +461,7 @@ if (typeof document !== "undefined") {
     human: ["Likely human-written", "human", "The text looks like the human writing the detector was trained on. AI text that has been heavily edited, or written in a plain or casual style, can still land here, so this isn't proof a person wrote it."],
     inconclusive: ["Inconclusive", "mixed", "Not enough evidence either way. Plenty of human writing and plenty of edited AI writing land here."],
     edited: ["Inconclusive: possibly edited AI", "mixed", "Few obvious AI habits, but casual touches sit on top of an AI-style explanation skeleton, which is what AI text looks like after someone edits it. People writing casually can look like this too. See the edited-AI check below."],
-    mixed: ["Mixed: part of it stands out", "mixed", "Most of the text looks human-leaning, but one paragraph shows far more AI habits than the rest. It's shaded in the flagged text below. People's writing varies too, so this is a reason to look closer, not proof."],
+    mixed: ["Mixed: part of it stands out", "mixed", "Most of the text doesn't look AI-written, but one paragraph reads as AI-written and differs in style from the rest, as if it was written separately. It's shaded in the flagged text below. People's writing varies too, so this is a reason to look closer, not proof."],
     ai: ["Likely AI-generated", "ai", "The text looks much more like the AI writing the detector was trained on than the human writing. That's a reason to look closer, not proof."]
   };
 
@@ -557,7 +559,9 @@ if (typeof document !== "undefined") {
   function renderMarked(r) {
     const text = r.text;
     const tints = r.mix.mixed ? [[r.mix.para.start, r.mix.para.end]] : [];
-    $("tintNote").textContent = tints.length ? `The shaded paragraph scored ${r.mix.para.score} on its own, while the other paragraphs scored around ${r.mix.para.median}.` : "";
+    $("tintNote").textContent = !tints.length ? "" : r.mix.model
+      ? `The shaded paragraph looks AI-written and unlike the rest of the text (mixed-writing check: ${Math.round(r.mix.para.p * 100)}%; it only reports Mixed above ${Math.round(r.mix.cut * 100)}%, a level very few fully human documents reach in testing).`
+      : `The shaded paragraph scored ${r.mix.para.score} on its own, while the other paragraphs scored around ${r.mix.para.median}.`;
     const cuts = new Set([0, text.length]);
     r.hits.forEach(h => { cuts.add(h.start); cuts.add(h.end); });
     tints.forEach(([a, b]) => { cuts.add(a); cuts.add(b); });
@@ -572,6 +576,17 @@ if (typeof document !== "undefined") {
       out += piece;
     }
     $("marked").innerHTML = out;
+    // v14 sentence-level evidence: sentences where two or more DIFFERENT clues land. A single formal word on its own
+    // is never listed, and nothing is listed for human-leaning results.
+    const W = { hard: 3, phrase: 2, struct: 1.5, trans: 1, word: 1 };
+    const sents = []; const re = /[^.!?\n]+(?:[.!?]+["')\]]*|\n|$)/g; let mm;
+    while ((mm = re.exec(text)) && sents.length < 400) { if (!mm[0].trim()) { re.lastIndex++; continue; } sents.push({ a: mm.index, b: mm.index + mm[0].length }); }
+    const scored = sents.map(x => { const hs = r.hits.filter(h => h.start < x.b && h.end > x.a); const labels = [...new Set(hs.map(h => h.label))];
+      return { ...x, labels, w: hs.reduce((t, h) => t + (W[h.type] || 1), 0) }; }).filter(x => x.labels.length >= 2).sort((p, q) => q.w - p.w).slice(0, 3);
+    const show = scored.length && r.band !== "human";
+    $("sentEv").classList.toggle("hide", !show);
+    $("sentEv").innerHTML = show ? `<b>Sentences with the most clues</b> <span class="note">(each has two or more different clues; one clue alone isn't evidence)</span>` +
+      scored.map(x => `<div class="seg"><div><div class="note" style="margin:0">“${escH(text.slice(x.a, x.b).trim().slice(0, 240))}”</div><div style="font-size:.85rem">${x.labels.map(escH).join(" · ")}</div></div></div>`).join("") : "";
   }
 
   let lastSummary = "";
@@ -660,15 +675,21 @@ if (typeof document !== "undefined") {
     }).join("") + `<div class="push-lbl"><span>human</span><span>AI</span></div>` : `<p class="none">No signals either way.</p>`;
 
     const segs = r.paras && r.paras.length >= 2 ? r.paras.map(p => ({ start: p.start, end: p.end, score: p.likelihood, words: p.words })) : r.segs;
+    // v14: the mixed-writing check's view of each paragraph (does it stand out from the rest AND look AI-written?)
+    const mixOf = s => r.mix && r.mix.paras ? r.mix.paras.find(q => Math.abs(q.start - s.start) < 3) : null;
     // paragraphs under 100 words are too short to score reliably: shown in grey
     const segTone = s => s.words != null && s.words < 100 ? "muted" : toneOf(s.score);
     $("segCard").classList.toggle("hide", segs.length < 2);
     if (segs.length >= 2) {
       const total = segs.reduce((a, s) => a + (s.end - s.start), 0);
       $("strip").innerHTML = segs.map((s, i) => `<div title="Paragraph ${i + 1}: ${s.score}" style="flex:${(s.end - s.start) / total};background:var(--${segTone(s)})">${s.score}</div>`).join("");
-      $("segs").innerHTML = segs.map((s, i) => `<div class="seg"><div class="badge" style="background:var(--${segTone(s)})">${s.score}</div><div><b>Paragraph ${i + 1}</b> · ${plural(nWords(r.text.slice(s.start, s.end)), "word")}${s.words != null && s.words < 100 ? " · short, unreliable" : ""}<div class="note">${escH(r.text.slice(s.start, s.end).trim().slice(0, 140))}…</div></div></div>`).join("");
+      $("segs").innerHTML = segs.map((s, i) => { const q = mixOf(s); const standout = q && q.p != null ? ` · stands out from the rest: ${q.p >= r.mix.cut ? "<b>yes</b>" : q.p >= 0.9 ? "a little" : "no"}` : "";
+        return `<div class="seg"><div class="badge" style="background:var(--${segTone(s)})">${s.score}</div><div><b>Paragraph ${i + 1}</b> · ${plural(nWords(r.text.slice(s.start, s.end)), "word")}${s.words != null && s.words < 100 ? " · short, unreliable" : ""}${standout}<div class="note">${escH(r.text.slice(s.start, s.end).trim().slice(0, 140))}…</div></div></div>`; }).join("");
       const hi = Math.max(...segs.map(s => s.score)), lo = Math.min(...segs.map(s => s.score));
-      if (r.mix.mixed) $("segs").insertAdjacentHTML("afterbegin", `<p style="margin:0 0 8px;font-size:.92rem"><b>One paragraph stands out:</b> it scores ${r.mix.para.score}, while the other paragraphs score around ${r.mix.para.median}. That's worth a closer look.</p>`);
+      if (r.mix.mixed) $("segs").insertAdjacentHTML("afterbegin", r.mix.model
+        ? `<p style="margin:0 0 8px;font-size:.92rem"><b>One paragraph stands out:</b> it reads as AI-written and differs in style from the other paragraphs (mixed-writing check ${Math.round(r.mix.para.p * 100)}%). People's style also shifts between an introduction, quotes and a conclusion, so this is a reason to look closer, not proof.</p>`
+        : `<p style="margin:0 0 8px;font-size:.92rem"><b>One paragraph stands out:</b> it scores ${r.mix.para.score}, while the other paragraphs score around ${r.mix.para.median}. That's worth a closer look.</p>`);
+      else if (r.mix && r.mix.model && r.mix.paras) $("segs").insertAdjacentHTML("afterbegin", `<p class="note" style="margin:0 0 8px">Mixed-writing check: no paragraph stands out enough to suggest part of the text was written separately by AI.</p>`);
     }
 
     renderMarked(r);

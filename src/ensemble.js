@@ -148,6 +148,21 @@ function assess(raw, opts = {}) {
   if (r.ood && m) { const zz = m.z * 0.25, M2 = DETECTOR_MODEL; m.p = 1 / (1 + Math.exp(-(M2.calibration.a * zz + M2.calibration.c))); r.likelihood = Math.round((r.specialist ? Math.max(m.p, 0.5) : m.p) * 100); r.score = r.likelihood; }
   // never call an out-of-distribution text AI-leaning unless the evidence is overwhelming or a chatbot left text behind
   if (r.ood && r.band === "ai" && !r.counts.hard && !(m && m.p >= 0.995)) r.band = "inconclusive";
+  // v14 mixed authorship (trained paragraph model, DETECTOR_MODEL.mixedModel). Skipped when the whole text is already
+  // AI-leaning or out of distribution. r.mix.paras holds every paragraph's probability for the page.
+  if (m && DETECTOR_MODEL.mixedModel) {
+    r.mix = { mixed: false, model: true };
+    if (!r.ood) {
+      try {
+        const ms = mixedScore(text, m.z);
+        if (ms) {
+          r.mix.paras = ms.paras.map(q => ({ start: q.start, end: q.end, p: q.p, words: q.wc }));
+          r.mix.cut = ms.cut;
+          if (ms.best.p >= ms.cut && r.band !== "ai") { r.mix.mixed = true; r.mix.para = { start: ms.best.start, end: ms.best.end, p: ms.best.p }; r.band = "mixed"; }
+        }
+      } catch (e) { r.mix.error = String(e && e.message || e); }
+    }
+  }
   const uncertain = m && (m.pHigh - m.pLow) > 0.35;
   r.confidence = r.evidence !== "limited" && r.agree && !r.ood && !uncertain && r.wc >= 250 ? "medium" : "low";
   r.uncertainty = [
@@ -187,6 +202,67 @@ function attributionFor(text) {
   return scoreWith(AM, R, styleFeatures(text), R.wc);
 }
 
+// v14 mixed-authorship features. For every paragraph of 30+ words (needs 3+ such paragraphs), describe the paragraph
+// on its own (model score, rule clues, style) and how much it differs from the rest of the same document. A trained
+// model (DETECTOR_MODEL.mixedModel) turns these into "probability this paragraph was written by AI and dropped into
+// otherwise human text". Natural shifts (introductions, conclusions, quotations) are learned from real human documents.
+const MIX_FW = ["the", "of", "and", "to", "a", "in", "that", "is", "was", "it", "for", "on", "with", "as", "i", "he", "they", "we", "you", "be", "at", "by", "this", "had", "not", "but", "from", "or", "have", "an", "which", "so", "if", "there", "all", "my", "would", "can", "their", "about", "just", "also", "very", "really", "because", "then", "more", "when", "like", "do", "some", "these", "could", "into", "than", "only", "such", "while", "our", "will", "are", "were"];
+const MIX_NAMES = ["zRaw", "zShr", "dzMed", "dzMax", "isTop", "styleDist", "styleOut", "fwDelta", "ruleDiff", "rule", "first", "last", "relPos", "nPara", "logWords", "quote", "cite", "zDoc", "famRules", "famStyle", "famWords", "pz", "dpzMed", "dpzMax"];
+function paraFeatures(text, docZ) {
+  const M = typeof DETECTOR_MODEL !== "undefined" ? DETECTOR_MODEL : null;
+  if (!M || !M.members) return null;
+  const items = []; let from = 0;
+  const sIdx = M.features.map((n, j) => n.startsWith("style:") ? j : -1).filter(j => j >= 0);
+  for (const p of paraSplit(text)) {
+    const at = text.indexOf(p, from); if (at < 0) continue; from = at + p.length;
+    const wc = nWords(p); if (wc < 30) continue;
+    const R = analyze(p, { noShrink: true }); if (R.tooShort) continue;
+    const sf = styleFeatures(p), m = modelScore(p, R, sf); if (!m) continue;
+    const lf = Math.max(0.3, Math.min(1, (wc - 40) / 260));
+    const words = (p.toLowerCase().match(/[a-z']+/g) || []), fw = {};
+    for (const w of words) if (MIX_FW.includes(w)) fw[w] = (fw[w] || 0) + 1;
+    const sv = sIdx.map(j => (sf.f[M.features[j].slice(6)] - M.mu[j]) / M.sd[j]);
+    const quoted = (p.match(/"[^"]{3,}"/g) || []).join("").length / Math.max(1, p.length);
+    // v14: paragraph-level classifier (trained on paragraphs, not whole documents), calibrated logit
+    let pz = 0;
+    if (M.paraModel) { const pp = Math.min(0.9999, Math.max(0.0001, scoreWith(M.paraModel, R, sf, wc))); pz = Math.log(pp / (1 - pp)); }
+    items.push({ start: at, end: at + p.length, wc, z: m.z, zRaw: m.z / lf, rule: R.score, sv, fw, n: words.length, quoted, cite: R.f.cite || 0, fam: m.fam, pz });
+  }
+  if (items.length < 3) return null;
+  const med = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  const fwRate = (fw, n) => MIX_FW.map(w => ((fw[w] || 0) / Math.max(1, n)) * 100);
+  const dists = items.map((it, i) => {
+    const o = items.filter((_, j) => j !== i), cen = it.sv.map((_, k) => o.reduce((a, x) => a + x.sv[k], 0) / o.length);
+    return Math.sqrt(it.sv.reduce((a, v, k) => a + Math.min(25, (v - cen[k]) ** 2), 0) / it.sv.length);
+  });
+  const medDist = med(dists) || 1;
+  return items.map((it, i) => {
+    const o = items.filter((_, j) => j !== i), oz = o.map(x => x.zRaw);
+    const ofw = {}; let on = 0; for (const x of o) { on += x.n; for (const w in x.fw) ofw[w] = (ofw[w] || 0) + x.fw[w]; }
+    const a = fwRate(it.fw, it.n), b = fwRate(ofw, on);
+    const fwDelta = MIX_FW.reduce((s, w, k) => s + Math.abs(a[k] - b[k]) / ((FW_STATS.sd[w] || 1)), 0) / MIX_FW.length;
+    const v = [it.zRaw, it.z, it.zRaw - med(oz), it.zRaw - Math.max(...oz), it.zRaw >= Math.max(...oz) ? 1 : 0, dists[i], dists[i] / medDist, fwDelta,
+      it.rule - med(o.map(x => x.rule)), it.rule, i === 0 ? 1 : 0, i === items.length - 1 ? 1 : 0, items.length > 1 ? i / (items.length - 1) : 0,
+      Math.min(items.length, 20), Math.log(it.wc), it.quoted, it.cite, docZ == null ? 0 : docZ, it.fam.rules, it.fam.style, it.fam.words,
+      it.pz, it.pz - med(o.map(x => x.pz)), it.pz - Math.max(...o.map(x => x.pz))];
+    return { start: it.start, end: it.end, wc: it.wc, v, p: null, zPara: it.z };
+  });
+}
+// score paragraphs with the mixed model; returns { paras, best, cut } or null
+function mixedScore(text, docZ) {
+  const MM = typeof DETECTOR_MODEL !== "undefined" && DETECTOR_MODEL ? DETECTOR_MODEL.mixedModel : null;
+  if (!MM) return null;
+  const P = paraFeatures(text, docZ); if (!P) return null;
+  let best = null;
+  for (const q of P) {
+    const x = MM.mu.map((mu, j) => (q.v[j] - mu) / MM.sd[j]);   // a model uses only the features it was trained with
+    const z = gbdtLogit(MM.gbdt, x);
+    q.p = 1 / (1 + Math.exp(-(MM.calibration.a * z + MM.calibration.c)));
+    if (!best || q.p > best.p) best = q;
+  }
+  return { paras: P, best, cut: MM.cut };
+}
+
 // Paragraph-level view: each paragraph scored by the model on its own (short paragraphs are unreliable).
 function paragraphView(text) {
   const out = []; let from = 0;
@@ -203,7 +279,7 @@ function paragraphView(text) {
 // ==/ENSEMBLE==
 if (typeof module !== "undefined") {
   const C = require("./core.js"), S = require("./stats.js");
-  Object.assign(global, { attribute: C.attribute, cleanText: C.cleanText, analyze: C.analyze, MODEL: C.MODEL, BANDS: C.BANDS, englishCoverage: C.englishCoverage, paraSplit: C.paraSplit, nWords: C.nWords, styleFeatures: S.styleFeatures, guessGenre: S.guessGenre });
+  Object.assign(global, { attribute: C.attribute, cleanText: C.cleanText, analyze: C.analyze, MODEL: C.MODEL, BANDS: C.BANDS, englishCoverage: C.englishCoverage, paraSplit: C.paraSplit, nWords: C.nWords, styleFeatures: S.styleFeatures, guessGenre: S.guessGenre, FW_STATS: C.FW_STATS });
   try { global.DETECTOR_MODEL = require("./model.json"); } catch (e) { /* no model: rule-engine fallback */ }
-  module.exports = { attributionFor, assess, modelScore, paragraphView, setModel: m => { global.DETECTOR_MODEL = m; ASSESS_CACHE.clear(); } };
+  module.exports = { attributionFor, assess, modelScore, paragraphView, paraFeatures, mixedScore, MIX_NAMES, setModel: m => { global.DETECTOR_MODEL = m; ASSESS_CACHE.clear(); } };
 }
