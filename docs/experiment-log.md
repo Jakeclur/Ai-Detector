@@ -88,3 +88,28 @@ At the shipped training-percentile cut (0.9975) it gave 12.0% / 1 false Mixed. C
 ## E5b. Bug fixed: tiny feature spreads rounded to zero
 
 `toJSON` stored standard deviations with `toFixed(5)`; a near-constant feature (`style:para_n` in the paragraph model) became 0 and every score became NaN. Now stored with 6 significant digits and a 1e-4 floor. The shipped general model was not affected (no zero spreads).
+
+## E6. G2 with per-source cut-offs (G3, `CUT_BY_SOURCE=1`) — rejected; general model stays v12.3
+
+Same data and weights as G2; the AI cut-off is the strictest of every human source's own 99.9th percentile (sources with 200+ texts), also for the specialists.
+
+| Dev | v12.3 | G2 | G3 |
+|---|---|---|---|
+| Core humans flagged | 1 / 7,664 | 12 | **0** |
+| DetectRL humans flagged | 5 / 2,550 | 4 | **0** |
+| Core recall | 80.7% | 83.0% | 72.0% |
+| Core ROC-AUC (cut-off independent) | **0.9954** | 0.9938 | 0.9940 |
+| OUTFOX ChatGPT essays (never trained on) | 35.0% | 36.2% | 7.5% |
+| Independent Claude (40 texts) | 40% | 45% | 30% |
+
+**Decision.** G2/G3 rank core test texts *worse* than v12.3 (lower AUC), so at the same false-flag level they catch less. Their gains were on DetectRL (now in-distribution) and a small, statistically insignificant gain on 40 independent Claude texts; on OUTFOX, which neither saw, there was no real gain. The v12.3 general model is kept. `CUT_BY_SOURCE` and `DRL_TRAIN` stay available for future data.
+
+## Perplexity / neural features — not added (reasons)
+
+- A real token-level perplexity feature needs a language model in the browser (for example GPT-2 small, about 120-500 MB of weights). Model hosting (Hugging Face) is blocked in this environment, so such a model could not be downloaded or tested here, and hard requirement 5 forbids adding one untested.
+- Cheap "perplexity" proxies (how common each word is) are vocabulary-richness measures in disguise: they score plain writing, including English learners', as AI-like. Hard requirement 4 forbids that.
+- Burstiness is already covered (sentence-length spread, skew, extremes, paragraph rhythm in `stats.js`).
+
+## E8. Recent-Claude specialist with DetectRL humans, independent Sonnet/Haiku and per-source cut-off — rejected
+
+The per-source rule pushed the specialist's cut-off to 1.0 (one human source has scores at 1.0), so it never fires: independent Claude 40% → 27.5%, project Opus texts 42% → 2%. Diagnostic value: with the specialist off, the single core false flag and 2 of the 5 DetectRL false flags disappear, so the specialist carries both most of the recent-Claude detection and part of the false-flag risk.
