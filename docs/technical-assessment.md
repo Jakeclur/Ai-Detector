@@ -130,3 +130,22 @@ These need more and better modern data, especially real outputs from current mod
 **Lessons:**
 - Choosing a cut-off percentile from held-out false-positive counts is unreliable. A 99.3rd-percentile cut-off flagged 1 human in one run and 17 after retraining. Cut-offs are now set only from the intended percentile.
 - Most remaining recent-Claude misses get 90–99 from the main model, but fall in the "other" genre, whose cut-off is held up by three ordinary human texts. Better genre recognition, or more modern human and AI data, is the way forward. Loosening the cut-off would flag real people.
+
+## 7. v12 re-test with corrected data (November 2026)
+
+**A data bug.** From v9 onwards, the data loader also read the Ghostbuster dataset's token-probability tables (files in `logprobs/` folders) as if they were texts. About 200 tables went into the "humaniser AI" group and about 100 into the GPTZero "human" group. So every humaniser figure from v9 to v12 (11–28%) mostly measured tables of numbers. With the loader fixed, v12 catches 91% of real humaniser texts (32 of 35 held out). That is a small test set from a single 2023 tool.
+
+**A bigger fairness test.** The ASAP set adds 12,428 school essays (US grades 7–10, 2012, before ChatGPT) as test-only data.
+
+**Results (v12, unchanged model):**
+- Humans wrongly flagged: 10 of 15,419 (0.06%). That's 8 ASAP essays and 2 Reddit stories. Other student and university essays: 0 of 1,078. English learners: 0 of 953.
+- Recall 81.2%, ROC-AUC 0.996, PR-AUC 0.994, F1 0.896, calibration error 0.016. Humans landing in "inconclusive": 1.2%.
+- The v9 rules on the same data flagged 24 humans (15 ASAP) and caught 50.1%.
+
+**Rejected v13 candidates:**
+- Making essay conventions neutral in training: recall 81% → 69%, and the owner's essay was flagged.
+- Training on ASAP with three different cut-off rules: each failed one of the checks (a new false flag, the owner's essay moved to "inconclusive", or recall down to 73%).
+- A retrain on more Ghostbuster data: fewer false flags at its own cut-off, but at an equal false-flag rate it ranked worse than v12 (74% vs 84% caught with zero humans flagged).
+
+**Lesson:** check what the loader actually reads. A file-name pattern that was too loose distorted one test group for three versions without anyone noticing.
+

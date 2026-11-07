@@ -217,6 +217,38 @@ The released model uses a stricter cut-off (the 99.9th percentile of human score
 
 So v12 trades about 1 point of overall recall for fewer people flagged or left in the grey zone, and for better resistance to rewording. The owner's essay scores 49, "Likely human-written", just under the 50 line.
 
+### v12 re-tested (Nov 2026): data fix and 12,428 more student essays
+Two things changed in the test data, not the model:
+
+1. **A data-loading bug was fixed.** Since v9, the loader had also read the Ghostbuster dataset's token-probability tables (files in `logprobs/` folders) as if they were texts. That put about 200 tables of numbers into the "humaniser AI" group and about 100 into the GPTZero "human" group. The humaniser results reported for v9–v12 (11–28%) were mostly measuring those tables. On the real humaniser texts, v12 catches **91%** (32 of 35 held-out texts; ranking AUC 1.000). The test set is small, and it all comes from one tool (undetectable.ai, 2023).
+2. **12,428 real school essays were added as a test-only fairness check:** the ASAP set (US students in grades 7–10, written in 2012, before ChatGPT existed). They're never used for training (`bash tests/data/fetch_asap.sh`, not committed).
+
+| Held-out, corrected data | v9 rules | v12 |
+|---|---|---|
+| Real human texts | 15,419 | 15,419 |
+| … wrongly flagged | 24 (0.16%) | **10 (0.06%)** |
+| … ASAP grade 7–10 school essays flagged (12,428) | 15 | **8** |
+| … other student / university essays flagged (1,078) | 9 | **0** |
+| … English-learner essays flagged (953) | 0 | 0 |
+| … Reddit stories flagged (490) | 0 | 2 |
+| … same texts with short lines removed / on one line | 28 / 23 | **10 / 9** |
+| Humans landing in "inconclusive" | 2.5% | **1.2%** |
+| AI caught, overall (7,082) | 50.1% | **81.2%** |
+| AI essays / stories / news | 56% / 22% / 8% | **84% / 60% / 58%** |
+| Humaniser-tool AI news (35) | 34% | **91%** |
+| Claude (2023) | 11% | **54%** |
+| Claude Opus 5.5, held out (39) / edited Opus (15) | 8% / 0% | **36% / 40%** |
+| Paraphrased / perturbed AI news | 16–38% | **57–76%** |
+| ROC-AUC / PR-AUC | 0.874 / 0.866 | **0.996 / 0.994** |
+| F1 / calibration error | 0.666 / 0.166 | **0.896 / 0.016** |
+
+About 1 in 1,500 real school essays was still wrongly flagged (8 of 12,428). That's rare, but not zero, which is why a high score must never be treated as proof.
+
+**Tried and rejected after this test (v13 candidates):**
+- **Treating essay conventions ("In conclusion", "Firstly", "Moreover") as neutral in training.** AI caught fell 81% → 69%, and the owner's own essay (body only) went from "inconclusive" to "likely AI". Code kept, switched off.
+- **Training on the ASAP essays as well.** Three cut-off rules were tried. One flagged a new university essay, one moved the owner's essay into "inconclusive", and one dropped AI caught to 73%. So ASAP stays test-only.
+- **Retraining on more Ghostbuster texts without ASAP.** Fewer people flagged, but AI caught fell to 65%. At an equal false-flag rate, v12 still ranked better (84% vs 74% caught with zero humans flagged), so v12 was kept.
+
 ### v11: held-out benchmark (`node tests/benchmark.js`, dashboard in `docs/benchmark.html`)
 Test half only: 2,339 human and 6,428 AI texts, split by prompt group, with 610 near-copies of training documents skipped.
 
@@ -241,7 +273,7 @@ Test half only: 2,339 human and 6,428 AI texts, split by prompt group, with 610 
 | **Claude Opus 5.5, held out (39 texts)** | 8% | **36%** |
 | **Opus 5.5 edited to sound like a student (15)** | 0% | **40%** |
 | Claude (2023) | 13% | 57% |
-| Humaniser-tool AI news | 11% | 28% |
+| Humaniser-tool AI news (see the v12 re-test: these figures were affected by a data bug) | 11% | 28% |
 | Paraphrased / perturbed AI news | 16–40% | 49–73% |
 
 **Which AI (Claude vs ChatGPT), when the detector names a model:**
@@ -532,6 +564,7 @@ node tests/lab.js tests/data/opus55/refined_holdout.txt  # "human-refined" versi
 | v7 | **Edited-AI check** for AI text a person has "humanised": casual touches on top of a leftover AI skeleton. New "Inconclusive: possibly edited AI" result (never AI-leaning), its own card, a "Possibly AI that a person has edited" suspected-AI line, and a caution note. Edited Opus 5.5: 0 → 6 of 15 labelled. Humans flagged as AI unchanged (10/2,056, 0/216, 0/9); 1 of 2,281 human texts gets the new inconclusive label |
 | v8 | Tested with a real student's English essay (thanks to the owner). It scored 28, "Human-leaning", but the old Mixed rule labelled it "Mixed", and the same rule hit 76 of 2,056 real human texts. **New Mixed rule:** one non-final paragraph 70+ and 40+ above the rest; shading now marks that whole paragraph. Humans labelled Mixed 76 → 6 of 2,262. Scores and AI-leaning results unchanged |
 | v9 | Bigger real-data test (5,303 human / 4,635 AI texts, incl. humaniser-tool output). In-text citations as a human sign; lone AI words count 40%; weights re-fitted; Mixed threshold 72. Humans flagged 33 → 15, AI caught 30% → 33%, with no human group getting worse |
+| v12.1 | No model change. Fixed a test-data bug (token-probability tables loaded as texts; real humaniser recall is 91%, not 28%); added 12,428 ASAP school essays as a test-only fairness check (8 flagged, 0.06%); new import scripts. v13 candidates (neutral essay conventions, ASAP training, bigger retrain) rejected |
 | v12 | Hashed character 3-gram features; trained genre classifier for the "type of writing" shown; stricter cut-offs (99.9th percentile); a reformatted-human-text robustness test in the benchmark. Held-out humans flagged 2 (reformatted versions 3 → 2), humans in "inconclusive" 3.5% → 2.8%, recall 83.3% → 82.3%, sentence-level rewording 53% → 57% |
 | v11 | Gradient-boosted trees blended with the logistic ensemble; trained Claude-vs-ChatGPT attribution (right 88–99% of the time when it names a model, vs 2–28% for the old clues); humaniser specialist; specialists need ≥5% support from the main model; "likely human" below 50; version hints from the recent-Claude model; 40 more Opus 5.5 samples. Held-out: humans flagged 3 → 2, recall 82.0% → 83.3%, Opus 5.5 29% → 36% (on a larger test set), edited Opus 0% → 40% |
 | v10 | **Rebuilt detection engine.** Statistical, structural and semantic feature extractors; a trained, calibrated logistic ensemble (7 bootstrap members) with fairness constraints; a recent-Claude specialist; genre-aware cut-offs; length shrinkage, chunked long documents and out-of-distribution checks; confidence and evidence quality; paragraph-by-paragraph model scores. New dataset layer with group splits and a near-duplicate leakage check, paraphrase and perturbation test sets, an import folder for new models, a full benchmark (accuracy, precision, recall, F1, FPR, FNR, ROC-AUC, PR-AUC, ECE) and dashboard, and 30 more Opus 5.5 samples. Held-out: recall 53% → 82%, humans flagged 0.38% → 0.13%, AUC 0.907 → 0.993 |

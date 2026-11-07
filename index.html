@@ -114,7 +114,7 @@
   <h1>AI Text Detector</h1>
   <p class="sub">See how many known AI-writing habits a text shows, which chatbot it looks more like, and where the AI-like parts are. You can also compare it with someone's known writing, or test the detector on your own examples.</p>
 
-  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. On a held-out test of 2,339 real human texts (including essays by people learning English) it wrongly flagged 2 (about 1 in 1,200), and it caught about 5 in 6 of 6,428 chatbot texts. That drops to about 1 in 3 for recent Claude, and lower for AI text a person or a humaniser tool has edited. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
+  <div class="warn"><b>Read this first:</b> no detector can prove who wrote something, and this one doesn't contain an AI model. It looks for writing habits that research has found chatbots overuse. On a held-out test of 15,419 real human texts (including 12,428 school essays by students in grades 7–10 and essays by people learning English) it wrongly flagged 10 (about 1 in 1,500), and it caught about 4 in 5 of 7,082 chatbot texts. That drops to about 1 in 3 for recent Claude, and lower for AI text a person or a humaniser tool has edited. AI text in a plain or casual style often gets through. A low score doesn't mean "human", and a high score means "look closer", never proof. Don't use it to accuse anyone.</div>
 
   <div class="tabs">
     <button class="tab on" data-tab="check">Check a text</button>
@@ -281,7 +281,21 @@ a Claude answer goes here…</pre>
 
   <details>
     <summary>How accurate is it?</summary>
-    <p><b>v12 (current)</b> adds letter-and-punctuation pattern features and a stricter cut-off: compared with v11 it flags the same number of real people (and fewer when their text is reformatted), leaves fewer people in "inconclusive" (2.8%), and copes better with reworded sentences, while catching about 1 point less AI overall (82%). The v11 table:</p>
+    <p><b>Re-tested in November 2026</b> (same v12 model, corrected test data). A loading bug had mixed number tables from the dataset into the "humaniser" test group, so the humaniser figures below (11% → 28%) were wrong. 12,428 real school essays (US grades 7–10, written in 2012, before ChatGPT) were also added as a fairness test the model never trains on.</p>
+    <div class="tablewrap"><table>
+      <tr><th>Held-out, corrected</th><th class="n">v9</th><th class="n">v12</th></tr>
+      <tr><td>Real human texts wrongly flagged (15,419)</td><td class="n">24 (0.16%)</td><td class="n">10 (0.06%)</td></tr>
+      <tr><td>… grade 7–10 school essays (12,428)</td><td class="n">15</td><td class="n">8</td></tr>
+      <tr><td>… other student and university essays (1,078)</td><td class="n">9</td><td class="n">0</td></tr>
+      <tr><td>… English-learner essays (953)</td><td class="n">0</td><td class="n">0</td></tr>
+      <tr><td>Real people left in "inconclusive"</td><td class="n">2.5%</td><td class="n">1.2%</td></tr>
+      <tr><td>AI texts caught, overall (7,082)</td><td class="n">50%</td><td class="n">81%</td></tr>
+      <tr><td>AI text run through a humaniser tool (35)</td><td class="n">34%</td><td class="n">91%</td></tr>
+      <tr><td>Claude Opus 5.5, held out (39) / edited Opus (15)</td><td class="n">8% / 0%</td><td class="n">36% / 40%</td></tr>
+      <tr><td>Paraphrased or reworded AI text</td><td class="n">16–38%</td><td class="n">57–76%</td></tr>
+    </table></div>
+    <p>About 1 in 1,500 real school essays was still wrongly flagged. That's rare, but it isn't zero.</p>
+    <p><b>v12</b> adds letter-and-punctuation pattern features and a stricter cut-off: compared with v11 it flags the same number of real people (and fewer when their text is reformatted), leaves fewer people in "inconclusive" (2.8%), and copes better with reworded sentences, while catching about 1 point less AI overall (82%). The v11 table:</p>
     <p><b>v11.</b> Trained models combine the writing-habit clues with statistical, structural and semantic features. On held-out texts the models never saw (2,339 human, 6,428 AI):</p>
     <div class="tablewrap"><table>
       <tr><th>Kind of text</th><th class="n">v9</th><th class="n">v11</th></tr>
@@ -294,7 +308,7 @@ a Claude answer goes here…</pre>
       <tr><td>Claude Opus 5.5, held out (39 texts)</td><td class="n">8%</td><td class="n">36%</td></tr>
       <tr><td>Opus 5.5 edited to sound like a student (15)</td><td class="n">0%</td><td class="n">40%</td></tr>
       <tr><td>Paraphrased or reworded AI text</td><td class="n">16–40%</td><td class="n">49–73%</td></tr>
-      <tr><td>AI text run through a humaniser tool</td><td class="n">11%</td><td class="n">28%</td></tr>
+      <tr><td>AI text run through a humaniser tool (affected by the data bug, see above)</td><td class="n">11%</td><td class="n">28%</td></tr>
       <tr><td>Right AI family named (Claude vs ChatGPT), when it names one</td><td class="n">2–28%</td><td class="n">88–99%</td></tr>
     </table></div>
     <p>Ranking quality (ROC-AUC) rose from 0.907 to 0.995, and the likelihood estimate is well calibrated (calibration error 0.014). Most AI test texts come from 2023 models, and no GPT-5/6, Gemini, DeepSeek or Llama samples were available, so accuracy on those is unknown. Full results: <code>docs/benchmark.html</code> in the project.</p>

@@ -99,7 +99,7 @@ This file gives a Claude Code session the full context of how this project was b
 - Opus 5.5 data now: 70 texts (46 train / 24 test) + 15 edited. All written by Opus 5.5 in this repo's session (contamination caveat in `tests/data/opus55/prompts.md`).
 
 ## v11 results (held-out benchmark)
-- Humans flagged 3 → 2 (0.09%; essays 0, learners 0, two Reddit stories), recall 82.0 → 83.3%, AUC 0.993 → 0.995, F1 0.901 → 0.909, humans inconclusive 4.2 → 3.5%. Opus 5.5 held out 36% (14/39), edited Opus 40% (6/15), humaniser 28%, Claude 2023 57%.
+- Humans flagged 3 → 2 (0.09%; essays 0, learners 0, two Reddit stories), recall 82.0 → 83.3%, AUC 0.993 → 0.995, F1 0.901 → 0.909, humans inconclusive 4.2 → 3.5%. Opus 5.5 held out 36% (14/39), edited Opus 40% (6/15), humaniser 28% (wrong: data bug, see v12.1), Claude 2023 57%.
 - Attribution (when a model is named): ChatGPT 99%, Claude 2023 91%, Opus 5.5 88%, humanised ChatGPT 97% (old rule clues: 2–28%).
 - Rejected in v11: word-class bigram profile (no consistent gain; code kept, `useClass` off); 99.3rd-percentile cut-off (0.7% FP after retraining, as the percentile implies); Opus weight 16/30 (no gain / more FP); model-based Mixed rule (no better); looser "other"-genre cut (its top human OOF scores are ordinary prose).
 - Opus 5.5 data: 110 texts (71 train / 39 test) + 15 edited.
@@ -108,9 +108,16 @@ This file gives a Claude Code session the full context of how this project was b
 
 ## v12 results
 - Hashed character 3-grams (512 buckets, `useChr` in `model.json`; `stats.js` computes `sf.chr`) added to the general model. Cut-offs now at the 99.9th / 99.95th percentile (`hiPct` 0.999, `genrePct` 0.9995): at 99.8 v12 flagged one more reformatted human essay (essay:790 with short lines removed) than v11.
-- Held-out: humans flagged 2 (same two Reddit stories); reformatted human texts (benchmark `reformatted`) 1 + 1 (v9: 12 + 8); humans inconclusive 2.8%; recall 82.3% (v11 83.3%); AUC 0.996; sentence paraphrase 57%, sentence edits 57%; Opus 36%, edited Opus 40%, humaniser 28%.
+- Held-out: humans flagged 2 (same two Reddit stories); reformatted human texts (benchmark `reformatted`) 1 + 1 (v9: 12 + 8); humans inconclusive 2.8%; recall 82.3% (v11 83.3%); AUC 0.996; sentence paraphrase 57%, sentence edits 57%; Opus 36%, edited Opus 40%, humaniser 28% (wrong: data bug, see v12.1).
 - Owner's essay: 49, "Likely human-written" (close to the 50 line).
 - In the explanation panel the 512 character patterns are summed into one row ("letter and punctuation patterns").
+
+## v12.1 (Nov 2026): corrected benchmark, no model change
+- **Data bug fixed:** since v9 the loaders (`tests/lib/datasets.js`, `tests/eval_ghostbuster.js`) also read Ghostbuster `logprobs/` token-probability tables as texts (~200 in `other/undetectable` = "humaniser AI", ~100 in `other/gptzero` = "human"). Walks now accept only `/^[0-9]+\.txt$/` and skip `logprobs`. Every humaniser figure before v12.1 (11–28%) is wrong; real v12 humaniser recall = 91.4% (32/35 test, AUC 1.000).
+- **ASAP** (US grades 7–10, 2012, 12,431 essays): `bash tests/data/fetch_asap.sh` → `tests/data/samples/asap.jsonl` (gitignored), every row `split: test`. **Test-only on purpose** (see rejected below).
+- The Ghostbuster folders hold 1,000 texts each (BAWE 1,444; Reuters 20 per journalist); `fetch_ghostbuster.sh` asks for more, which is harmless. Split: n ≤ 150 or 301–600 train; n > 900 → `n % 5 < 3` train.
+- Benchmark, v12 (24,179 test docs, 947 near-copies skipped; 15,419 human / 7,082 AI): humans flagged 10 (0.06%) = 8 ASAP (sets 3, 4, 5, 7) + 2 Reddit stories; other essays 0/1,078; learners 0/953; reformatted 10 + 9; inconclusive humans 1.2%; recall 81.2%; AUC 0.996; PR-AUC 0.994; F1 0.896; ECE 0.016. Essays 84%, stories 60%, news 58%, humaniser 91%, Claude 2023 54%, Opus 36%, edited Opus 40%, prompt variants 91%, perturbed 57–76%. v9 on the same data: 24 flagged (15 ASAP), recall 50.1%.
+- **Rejected v13 candidates:** (1) neutral essay conventions in training (`opts.neutral`, off): recall 81 → 69%, owner essay (body only) 84 → 98 "ai". (2) ASAP in training with three cut-off rules: one flagged a new essay/human text, one moved the owner essay to 68 inconclusive, one dropped recall to 73%. (3) data-only retrain (more Ghostbuster): fewer FPs but recall 64.5%; at equal test FP v12 ranks better (84.4% vs 74.3% at FP 0).
 
 ## Decisions and rejected ideas
 - **v5 fairness fixes (from real learner essays):** "I hope this helps" is a stock phrase, not a certain giveaway (a Reddit writer used it); "I think" doesn't count as casual for the too-clean rule; the hopeful-ending clue needs dialogue or fiction clichés; lists of -ing words aren't trailing clauses; each AI word counts at most twice and tier-1 everyday words count half; "Copy code" only counts on its own line.
