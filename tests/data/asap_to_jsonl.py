@@ -1,8 +1,8 @@
 """Convert the ASAP essay set (training_set_rel3.tsv) into tests/data/samples/asap.jsonl.
 
 ASAP (Automated Student Assessment Prize, Hewlett Foundation, 2012): about 13,000 essays by US students in
-grades 7-10, written before chatbots existed. Used here as real teenage human writing for training and for
-false-positive testing. Anonymisation codes such as @PERSON1 are replaced with ordinary words.
+grades 7-10, written before chatbots existed. Used here as real teenage human writing for false-positive
+testing only (split "test"): training on it was tried in v13 and didn't make the detector fairer. Anonymisation codes such as @PERSON1 are replaced with ordinary words.
 The output is gitignored: the essays are not redistributed in this repo.
 
     python3 tests/data/asap_to_jsonl.py training_set_rel3.tsv tests/data/samples/asap.jsonl
@@ -24,5 +24,5 @@ with open(src, encoding="latin-1") as f, open(dst, "w") as out:
         if len(text.split()) < 40: continue
         s = int(row["essay_set"])
         out.write(json.dumps({"text": text, "label": "human", "model": "human", "genre": GENRE[s], "condition": "original",
-                              "source": f"asap/set{s}", "group": "asap:" + row["essay_id"]}) + "\n"); n += 1
+                              "source": f"asap/set{s}", "group": "asap:" + row["essay_id"], "split": "test"}) + "\n"); n += 1
 print(n, "essays written")
