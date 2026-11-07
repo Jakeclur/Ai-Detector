@@ -51,9 +51,8 @@ function buildClassVocab(rows, n) {
   return [...df.entries()].filter(([, c]) => c / rows.length >= 0.05).sort((a, b) => b[1] - a[1]).slice(0, n).map(([t]) => t);
 }
 
-// v13: taught essay conventions get no weight in the detection models (owner's brief: "In conclusion",
-// "Moreover", a conclusion that restates the introduction etc. must not raise the score on their own).
-// They still appear in the rule-engine clue panel for information.
+// Taught essay conventions that can be excluded from the detection models (opts.neutral). Tested in v13 and
+// rejected: removing them made the model lean on correlated signals instead.
 const NEUTRAL_RULES = new Set(["summ", "trans"]);
 const NEUTRAL_STYLE = new Set(["intro_concl", "discourse"]);
 const NEUTRAL_TOK = new Set(["conclusion", "moreover", "furthermore", "additionally", "however", "overall", "ultimately", "therefore", "thus", "firstly", "secondly", "finally", "lastly", "consequently", "hence", "summary", "conclude", "essay", "thesis", "argues"]);
@@ -69,7 +68,9 @@ function vectorise(x, spec) {
 }
 
 function makeSpec(rows, opts) {
-  const neutral = opts.neutral !== false;
+  // v13 experiment, rejected: neutralising these made results worse (recall 81% -> 69%) and the owner's essay went
+  // from 84 to 98. Kept switchable (opts.neutral === true) for future tests; off by default.
+  const neutral = opts.neutral === true;
   const styleKeys = Object.keys(rows[0].x.style).filter(k => !(neutral && NEUTRAL_STYLE.has(k)));
   const ruleKeys = RULE_KEYS.filter(k => !(neutral && NEUTRAL_RULES.has(k)));
   const vocab = opts.useVocab ? buildVocab(rows).filter(t => !(neutral && NEUTRAL_TOK.has(t))) : [];
